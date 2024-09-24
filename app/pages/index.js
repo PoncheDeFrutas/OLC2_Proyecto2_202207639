@@ -1,5 +1,5 @@
 import { parse } from "../js/grammar/analyzer.js";
-import { InterpreterVisitor } from "../js/ast/interpreter.js";
+import {CompilerVisitor} from "../js/ast/compiler.js";
 
 function executeCode() {
     const code = editor.getValue();
@@ -10,7 +10,7 @@ function executeCode() {
     }
     
     let errorMessages = [];
-    let interpreter = new InterpreterVisitor();
+    let interpreter = new CompilerVisitor();
 
     try {
         const exp = parse(code);
@@ -49,7 +49,7 @@ function executeCode() {
         message = "Errores encontrados:\n" + errorMessages.map(e => e.fullMessage).join('\n');
     }
 
-    const consoleOutput = interpreter?.Console || "";
+    const consoleOutput = interpreter?.code.toString() || "";
     if (infoArea) {
         infoArea.value = `${consoleOutput.replace("\\n", "\n")}\n${message}\n`;
     }
