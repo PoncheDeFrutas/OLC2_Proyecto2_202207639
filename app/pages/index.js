@@ -51,7 +51,7 @@ function executeCode() {
 
     const consoleOutput = interpreter?.code.toString() || "";
     if (infoArea) {
-        infoArea.value = `${consoleOutput.replace("\\n", "\n")}\n${message}\n`;
+        infoArea.value = `${consoleOutput}\n${message}\n`;
     }
 }
 

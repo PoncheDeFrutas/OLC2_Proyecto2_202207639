@@ -14,153 +14,347 @@ export class CompilerVisitor extends BaseVisitor {
      */
     visitExpressionStatement(node) {
         node.exp.accept(this);
-        this.code.popObject(r.T0);
-    }
-
-    /**
-     * @type [BaseVisitor['visitBinaryExpression']]
-     */
-    visitLiteral(node) {
-        this.code.comment('Literal: ' + node.value);
-        this.code.pushConstant(node);
-        this.code.comment('End Literal: ' + node.value);
-    }
-
-    /**
-     * @type [BaseVisitor['visitArithmetic']]
-     */
-    visitArithmetic(node) {
-        this.code.comment('Arithmetic: ' + node.op);
-        node.left.accept(this);
-        node.right.accept(this);
-
-        this.code.popObject(r.T0);
-        this.code.popObject(r.T1);
-
-        switch (node.op) {
-            case '+':
-                this.code.add(r.T0, r.T0, r.T1);
-                break;
-            case '-':
-                this.code.sub(r.T0, r.T1, r.T0);
-                break;
-            case '*':
-                this.code.mul(r.T0, r.T0, r.T1);
-                break;
-            case '/':
-                this.code.div(r.T0, r.T1, r.T0);
-                break;
-            case '%':
-                this.code.rem(r.T0, r.T1, r.T0);
-                break;
-        }
-
-        this.code.push();
-        this.code.pushObject({type: 'int', length: 4});
-        this.code.comment('End Arithmetic: ' + node.op);
-    }
-
-    /**
-     * @type [BaseVisitor['visitUnary']]
-     */
-    visitUnary(node) {
-        this.code.comment('Unary: ' + node.op);
-        node.exp.accept(this);
-
         this.code.popObject();
-
-        switch (node.op) {
-            case '-':
-                this.code.li(r.T1, 0);
-                this.code.sub(r.T0, r.T1, r.T0);
-                this.code.push(r.T0)
-                this.code.pushObject({type: 'int', length: 4});
-                break;
-        }
-        this.code.comment('End Unary: ' + node.op);
     }
 
     /**
      * @type [BaseVisitor['visitGroup']]
      */
     visitGroup(node) {
-        return node.exp.accept(this);
+        node.exp.accept(this);
+    }
+
+    /**
+     * @type [BaseVisitor['visitLiteral']]
+     */
+    visitLiteral(node) {
+        this.code.comment(`Literal: ${node.value}`);
+        this.code.pushConstant(node);
+        this.code.comment(`Literal: ${node.value} end`);
     }
 
     /**
      * @type [BaseVisitor['visitPrint']]
      */
     visitPrint(node) {
-        this.code.comment('Print');
-        node.exp[0].accept(this);
-        const object = this.code.popObject(r.A0);
+        this.code.comment(`Print`);
 
-        const type = {
+        const print = {
             'int': () => this.code.printInt(),
-            'string': () => this.code.printString()
+            'bool': () => this.code.printInt(),
+            'char': () => this.code.printChar(),
+            'string': () => this.code.printString(),
+        }
+        
+        node.exp.forEach(exp => {
+           exp.accept(this);
+           const object = this.code.popObject(r.A0);
+           print[object.type]();
+           
+           this.code.li(r.A0, 10);
+           this.code.li(r.A7, 11);
+           this.code.ecall();
+        });
+
+        this.code.comment(`Print end`);
+    }
+
+
+    /**
+     * @type [BaseVisitor['visitArithmetic']]
+     */
+    visitArithmetic(node) {
+        this.code.comment(`Arithmetic ${node.op}`);
+        
+        node.left.accept(this);
+        node.right.accept(this);
+        
+        const left = this.code.popObject(r.T1);
+        const right = this.code.popObject(r.T0);
+        
+        if (left.type === 'string' && right.type === 'string') {
+            this.code.add(r.A0, r.ZERO, r.T1);
+            this.code.add(r.A1, r.ZERO, r.T0);
+            this.code.callBuiltin('concatString');
+            this.code.pushObject({type: 'string', length: 4});
+            return null;
         }
 
-        type[object.type]();
-        this.code.comment('End Print');
+        const ops = {
+            '+': () => this.code.add(r.T0, r.T1, r.T0),
+            '-': () => this.code.sub(r.T0, r.T1, r.T0),
+            '*': () => this.code.mul(r.T0, r.T1, r.T0),
+            '/': () => this.code.div(r.T0, r.T1, r.T0),
+            '%': () => this.code.rem(r.T0, r.T1, r.T0),
+        };
+        
+        ops[node.op]();
+        this.code.pushObject({type: left.type, length: 4});
+    }
+
+    /**
+     * @type [BaseVisitor['visitRelational']]
+     */
+    visitRelational(node) {
+        this.code.comment(`Relational ${node.op}`);
+
+        const labels = {
+            aux: this.code.getLabel(),
+            end: this.code.getLabel(),
+        };
+
+        node.left.accept(this);
+        node.right.accept(this);
+
+        const left = this.code.popObject(r.T1);
+        const right = this.code.popObject(r.T0);
+
+        if (left.type === 'string' && right.type === 'string') {
+            this.code.add(r.A0, r.ZERO, r.T1);
+            this.code.add(r.A1, r.ZERO, r.T0);
+            this.code.callBuiltin('compareString');
+
+            const stringOps = {
+                '==': () => this.code.beq(r.T0, r.ZERO, labels.aux),
+                '!=': () => this.code.bne(r.T0, r.ZERO, labels.aux),
+            };
+
+            stringOps[node.op]();
+        } else {
+            const ops = {
+                '<': () => this.code.blt(r.T1, r.T0, labels.aux),
+                '>': () => this.code.blt(r.T0, r.T1, labels.aux),
+                '<=': () => this.code.bge(r.T0, r.T1, labels.aux),
+                '>=': () => this.code.bge(r.T1, r.T0, labels.aux),
+                '==': () => this.code.beq(r.T0, r.T1, labels.aux),
+                '!=': () => this.code.bne(r.T0, r.T1, labels.aux),
+            };
+
+            ops[node.op]();
+        }
+
+        this.code.li(r.T0, 0);
+        this.code.push();
+        this.code.j(labels.end);
+
+        this.code.addLabel(labels.aux);
+        this.code.li(r.T0, 1);
+        this.code.push();
+
+        this.code.addLabel(labels.end);
+        this.code.pushObject({ type: 'bool', length: 4 });
+
+        this.code.comment(`Relational ${node.op} end`);
+    }
+
+
+    /**
+     * @type [BaseVisitor['visitLogical']]
+     */
+    visitLogical(node) {
+        this.code.comment(`Logical ${node.op}`);
+
+        const labels = {
+            aux: this.code.getLabel(),
+            end: this.code.getLabel(),
+        };
+
+        node.left.accept(this);
+        this.code.popObject();
+
+        const isAnd = node.op === '&&';
+        const branch = isAnd ? this.code.beq : this.code.bne;
+
+        branch.call(this.code, r.T0, r.ZERO, labels.aux);
+
+        node.right.accept(this);
+        this.code.popObject();
+
+        branch.call(this.code, r.T0, r.ZERO, labels.aux);
+
+        this.code.li(r.T0, isAnd ? 1 : 0);
+        this.code.push();
+        this.code.j(labels.end);
+
+        this.code.addLabel(labels.aux);
+        this.code.li(r.T0, isAnd ? 0 : 1);
+        this.code.push();
+
+        this.code.addLabel(labels.end);
+        this.code.pushObject({type: 'bool', length: 4});
+
+        this.code.comment(`Logical ${node.op} end`);
+    }
+
+    /**
+     * @type [BaseVisitor['visitUnary']]
+     */
+    visitUnary(node) {
+        this.code.comment(`Unary ${node.op}`);
+        
+        node.exp.accept(this);
+        this.code.popObject();
+        
+        const ops = {
+            '-': () => this.code.sub(r.T0, r.ZERO, r.T0),
+            '!': () => this.code.xori(r.T0, r.T0, 1),
+        };
+        
+        ops[node.op]();
+        this.code.push();
+        
+        const resultType = (node.op === '-') ? 'int' : 'bool';
+        this.code.pushObject({type: resultType, length: 4});
+        this.code.comment(`Unary ${node.op} end`);
+        
     }
 
     /**
      * @type [BaseVisitor['visitVarDeclaration']]
      */
     visitVarDeclaration(node) {
-        this.code.comment('Var Declaration: ' + node.id);
+        this.code.comment(`Variable declaration ${node.id}`);
+        
         node.value.accept(this);
         this.code.tagObject(node.id);
-        this.code.comment('End Var Declaration: ' + node.id);
+        
+        this.code.comment(`Variable declaration ${node.id} end`);
     }
 
     /**
      * @type [BaseVisitor['visitVarAssign']]
      */
     visitVarAssign(node) {
-        this.code.comment('Var Assign: ' + node.id);
+        this.code.comment(`Variable assign ${node.id}`);
 
         node.assign.accept(this);
-        const object = this.code.popObject(r.T0);
-        const [offset, tag] = this.code.getObject(node.id);
+        const value = this.code.popObject();
+        const [offset, object] = this.code.getObject(node.id);
 
-        this.code.addi(r.T1, r.SP, offset)
+        this.code.addi(r.T1, r.SP, offset);
+
+        if (node.op !== '=')  {
+            this.code.lw(r.T2, r.T1);
+
+            if (node.sig === '+=') {
+                this.code.add(r.T0, r.T2, r.T0);
+            } else {
+                this.code.sub(r.T0, r.T2, r.T0);
+            }
+        }
+
         this.code.sw(r.T0, r.T1);
+        
+        object.type = value.type;
 
-        tag.type = object.type;
-        this.code.push(r.T0);
+        this.code.push();
         this.code.pushObject(object);
 
-        this.code.comment('End Var Assign: ' + node.id);
+        this.code.comment(`Variable assign ${node.id} end`);
     }
 
     /**
      * @type [BaseVisitor['visitVarValue']]
      */
     visitVarValue(node) {
-        this.code.comment('Var Value: ' + node.id);
-        const [offset, tag] = this.code.getObject(node.id);
+        this.code.comment(`Variable value ${node.id}`);
+        
+        const [offset, object] = this.code.getObject(node.id);
         this.code.addi(r.T0, r.SP, offset);
-        this.code.lw(r.T0, r.T0);
-        this.code.push(r.T0);
-        this.code.pushObject({ ... tag, id:undefined});
-        this.code.comment('End Var Value: ' + node.id);
+        this.code.lw(r.T1, r.T0);
+        this.code.push(r.T1);
+        this.code.pushObject({...object, id:undefined});
+
+        this.code.comment(`Variable value ${node.id} end`);
     }
 
     /**
      * @type [BaseVisitor['visitBlock']]
      */
     visitBlock(node) {
-        this.code.comment('Block');
-        this.code.newScope();
-        node.stmt.forEach((statement) => statement.accept(this));
+        this.code.comment(`Block`);
         
-        this.code.comment('Reduce Stack')
-        const remove = this.code.endScope();
-        if (remove > 0) {
-            this.code.addi(r.SP, r.SP, remove);
+        this.code.newScope();
+        
+        node.stmt.forEach(stmt => stmt.accept(this));
+        
+        this.code.comment(`Stack reduce`);
+        
+        this.code.addi(r.SP, r.SP, this.code.endScope());
+        
+        this.code.comment(`Block end`);
+    }
+
+    /**
+     * @type [BaseVisitor['visitBlock']]
+     */
+    visitIf(node) {
+        this.code.comment(`If statement`);
+
+        node.cond.accept(this);
+        this.code.popObject();
+
+        const endLabel = this.code.getLabel();
+        const elseLabel = node.stmtElse ? this.code.getLabel() : null;
+
+        if (elseLabel) {
+            this.code.beq(r.T0, r.ZERO, elseLabel);
+        } else {
+            this.code.beq(r.T0, r.ZERO, endLabel);
+        }
+
+        node.stmtThen.accept(this);
+
+        if (elseLabel) {
+            this.code.j(endLabel);
+            this.code.addLabel(elseLabel);
+            node.stmtElse.accept(this);
+        }
+
+        this.code.addLabel(endLabel);
+
+        this.code.comment(`If statement end`);
+    }
+    
+    visitLoop(cond, body, update = null) {
+
+        const loopLabel = this.code.getLabel();
+        const endLabel = this.code.getLabel();
+
+        this.code.addLabel(loopLabel);
+
+        cond.accept(this);
+        this.code.popObject();
+        
+        this.code.beq(r.T0, r.ZERO, endLabel);
+        
+        body.accept(this);
+        
+        if (update) {
+            update.accept(this);
         }
         
-        this.code.comment('End Block');
+        this.code.j(loopLabel);
+        this.code.addLabel(endLabel);
     }
+
+    /**
+     * @type [BaseVisitor['visitWhile']]
+     */
+    visitWhile(node) {
+        this.code.comment(`While statement`);
+        this.visitLoop(node.cond, node.stmt);
+        this.code.comment(`While statement end`);
+    }
+
+    /**
+     * @type [BaseVisitor['visitWhile']]
+     */
+    visitFor(node) {
+        this.code.comment(`For statement`);
+        node.init.accept(this);
+        this.visitLoop(node.cond, node.stmt, node.update);
+        this.code.comment(`For statement end`);
+    }
+
 }
