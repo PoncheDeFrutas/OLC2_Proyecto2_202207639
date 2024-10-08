@@ -89,6 +89,7 @@ export class CompilerVisitor extends BaseVisitor {
         };
         
         ops[node.op]();
+        this.code.push();
         this.code.pushObject({type: left.type, length: 4});
     }
 
@@ -106,8 +107,8 @@ export class CompilerVisitor extends BaseVisitor {
         node.left.accept(this);
         node.right.accept(this);
 
-        const left = this.code.popObject(r.T1);
-        const right = this.code.popObject(r.T0);
+        const left = this.code.popObject(r.T0);
+        const right = this.code.popObject(r.T1);
 
         if (left.type === 'string' && right.type === 'string') {
             this.code.add(r.A0, r.ZERO, r.T1);
@@ -233,7 +234,7 @@ export class CompilerVisitor extends BaseVisitor {
 
         this.code.addi(r.T1, r.SP, offset);
 
-        if (node.op !== '=')  {
+        if (node.sig !== '=')  {
             this.code.lw(r.T2, r.T1);
 
             if (node.sig === '+=') {
@@ -317,7 +318,6 @@ export class CompilerVisitor extends BaseVisitor {
     }
     
     visitLoop(cond, body, update = null) {
-
         const loopLabel = this.code.getLabel();
         const endLabel = this.code.getLabel();
 
@@ -348,7 +348,7 @@ export class CompilerVisitor extends BaseVisitor {
     }
 
     /**
-     * @type [BaseVisitor['visitWhile']]
+     * @type [BaseVisitor['visitFor']]
      */
     visitFor(node) {
         this.code.comment(`For statement`);
