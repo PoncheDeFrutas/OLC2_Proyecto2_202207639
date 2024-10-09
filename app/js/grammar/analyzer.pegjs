@@ -185,7 +185,17 @@ Arguments
 Assignment
     = id:Callee _ sig:("=" / "+=" / "-=") _ assign:Assignment {
         if (id instanceof nodes.VarValue) {
-            return createNode('VarAssign', { id: id.id, sig, assign })
+            if (sig === '=') {
+                return createNode('VarAssign', { id: id.id, assign })
+            } else {
+                let op;
+                if (sig === '+=') {
+                    op = createNode('Arithmetic', { op: '+', left: id, right: assign })
+                } else {
+                    op = createNode('Arithmetic', { op: '-', left: id, right: assign })
+                }
+                return createNode('VarAssign', { id: id.id, assign: op })
+            }
         } else if (id instanceof nodes.Get) {
             return createNode('Set', { object: id.object, property: id.property, value: assign, sig })
         }

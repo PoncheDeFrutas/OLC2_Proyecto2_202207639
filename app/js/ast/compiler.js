@@ -51,10 +51,10 @@ export class CompilerVisitor extends BaseVisitor {
            const object = this.code.popObject(r.A0);
            print[object.type]();
            
-           this.code.li(r.A0, 10);
-           this.code.li(r.A7, 11);
-           this.code.ecall();
         });
+        this.code.li(r.A0, 10);
+        this.code.li(r.A7, 11);
+        this.code.ecall();
 
         this.code.comment(`Print end`);
     }
@@ -68,10 +68,10 @@ export class CompilerVisitor extends BaseVisitor {
         
         node.left.accept(this);
         node.right.accept(this);
-        
-        const left = this.code.popObject(r.T1);
+
         const right = this.code.popObject(r.T0);
-        
+        const left = this.code.popObject(r.T1);
+
         if (left.type === 'string' && right.type === 'string') {
             this.code.add(r.A0, r.ZERO, r.T1);
             this.code.add(r.A1, r.ZERO, r.T0);
@@ -107,8 +107,8 @@ export class CompilerVisitor extends BaseVisitor {
         node.left.accept(this);
         node.right.accept(this);
 
-        const left = this.code.popObject(r.T0);
-        const right = this.code.popObject(r.T1);
+        const right = this.code.popObject(r.T0);
+        const left = this.code.popObject(r.T1);
 
         if (left.type === 'string' && right.type === 'string') {
             this.code.add(r.A0, r.ZERO, r.T1);
@@ -234,16 +234,6 @@ export class CompilerVisitor extends BaseVisitor {
 
         this.code.addi(r.T1, r.SP, offset);
 
-        if (node.sig !== '=')  {
-            this.code.lw(r.T2, r.T1);
-
-            if (node.sig === '+=') {
-                this.code.add(r.T0, r.T2, r.T0);
-            } else {
-                this.code.sub(r.T0, r.T2, r.T0);
-            }
-        }
-
         this.code.sw(r.T0, r.T1);
         
         object.type = value.type;
@@ -277,7 +267,9 @@ export class CompilerVisitor extends BaseVisitor {
         
         this.code.newScope();
         
-        node.stmt.forEach(stmt => stmt.accept(this));
+        node.stmt.forEach(stmt => {
+            if (stmt) stmt.accept(this);
+        });
         
         this.code.comment(`Stack reduce`);
         
@@ -316,11 +308,40 @@ export class CompilerVisitor extends BaseVisitor {
 
         this.code.comment(`If statement end`);
     }
-    
+
+    /**
+     * @type [BaseVisitor['visitTernary']]
+     */
+    visitTernary(node) {
+        this.code.comment(`Ternary`);
+        
+        node.cond.accept(this);
+        this.code.popObject();
+        
+        const falseLabel = this.code.getLabel();
+        const endLabel = this.code.getLabel();
+        
+        this.code.beq(r.T0, r.ZERO, falseLabel);
+        
+        node.trueExp.accept(this);
+        this.code.j(endLabel);
+        
+        this.code.addLabel(falseLabel);
+        node.falseExp.accept(this);
+        
+        this.code.addLabel(endLabel);
+        
+        this.code.comment(`Ternary end`);
+    }
+
     visitLoop(cond, body, update = null) {
         const loopLabel = this.code.getLabel();
         const endLabel = this.code.getLabel();
+        const continueLabel = this.code.getLabel();
 
+        this.code.pushBreakLabel(endLabel);
+        this.code.pushContinueLabel(continueLabel);
+        
         this.code.addLabel(loopLabel);
 
         cond.accept(this);
@@ -330,12 +351,17 @@ export class CompilerVisitor extends BaseVisitor {
         
         body.accept(this);
         
+        this.code.addLabel(continueLabel);
+        
         if (update) {
             update.accept(this);
         }
         
         this.code.j(loopLabel);
         this.code.addLabel(endLabel);
+        
+        this.code.popBreakLabel();
+        this.code.popContinueLabel();
     }
 
     /**
@@ -357,4 +383,77 @@ export class CompilerVisitor extends BaseVisitor {
         this.code.comment(`For statement end`);
     }
 
+    /**
+     * @type [BaseVisitor['visitBreak']]
+     */
+    visitBreak(node) {
+        this.code.comment(`Break`);
+        const breakLabel = this.code.breakLabel[this.code.breakLabel.length - 1];
+        this.code.j(breakLabel);
+        this.code.comment(`Break end`);
+    }
+
+    /**
+     * @type [BaseVisitor['visitContinue']]
+     */
+    visitContinue(node) {
+        this.code.comment(`Continue`);
+        const continueLabel = this.code.continueLabel[this.code.continueLabel.length - 1];
+        this.code.j(continueLabel);
+        this.code.comment(`Continue end`);
+    }
+
+    /**
+     * @type [BaseVisitor['visitCase']]
+     */
+    visitCase(node) {
+        this.code.comment(`Case statement`)
+        node.stmt.forEach(stmt => stmt.accept(this));
+        this.code.comment(`Case statement end`)
+    }
+
+    /**
+     * @type [BaseVisitor['visitSwitch']]
+     */
+    visitSwitch(node) {
+        this.code.comment(`Switch statement`);
+
+        node.cond.accept(this);
+        this.code.popObject(r.T1);
+
+        const caseLabels = node.cases.map(() => this.code.getLabel());
+        const defaultLabel = node.def ? this.code.getLabel() : null;
+        const endLabel = this.code.getLabel();
+
+        this.code.pushBreakLabel(endLabel);
+
+        node.cases.forEach((Case, i) => {
+            Case.cond.accept(this);
+            this.code.popObject(r.T0);
+
+            this.code.beq(r.T1, r.T0, caseLabels[i]);
+        });
+
+        if (defaultLabel) {
+            this.code.j(defaultLabel);
+        } else {
+            this.code.j(endLabel);
+        }
+
+        node.cases.forEach((Case, index) => {
+            this.code.addLabel(caseLabels[index]);
+            this.visitCase(Case);
+        });
+
+        if (defaultLabel) {
+            this.code.addLabel(defaultLabel);
+            node.def.accept(this);
+        }
+
+        this.code.addLabel(endLabel);
+        this.code.popBreakLabel();
+
+        this.code.comment(`Switch statement end`);
+    }
+    
 }

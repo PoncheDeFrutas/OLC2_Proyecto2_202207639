@@ -27,6 +27,8 @@ export class Generator {
 
         this._labelCounter = 0;
         this._usedBuiltins = new Set();
+        this.breakLabel = [];
+        this.continueLabel = [];
     }
 
     getLabel() {
@@ -37,6 +39,22 @@ export class Generator {
         label = label || this.getLabel();
         this.instrucctions.push(new Instruction(`${label}:`));
         return label;
+    }
+    
+    pushBreakLabel(label) {
+        this.breakLabel.push(label);
+    }
+    
+    pushContinueLabel(label) {
+        this.continueLabel.push(label);
+    }
+    
+    popBreakLabel() {
+        return this.breakLabel.pop();
+    }
+    
+    popContinueLabel() {
+        return this.continueLabel.pop();
     }
 
     // Arithmetic Operations
