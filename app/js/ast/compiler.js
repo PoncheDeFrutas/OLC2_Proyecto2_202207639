@@ -355,6 +355,7 @@ export class CompilerVisitor extends BaseVisitor {
         
         if (update) {
             update.accept(this);
+            this.code.popObject();
         }
         
         this.code.j(loopLabel);
@@ -378,8 +379,10 @@ export class CompilerVisitor extends BaseVisitor {
      */
     visitFor(node) {
         this.code.comment(`For statement`);
+        this.code.newScope();
         node.init.accept(this);
         this.visitLoop(node.cond, node.stmt, node.update);
+        this.code.addi(r.SP, r.SP, this.code.endScope());
         this.code.comment(`For statement end`);
     }
 

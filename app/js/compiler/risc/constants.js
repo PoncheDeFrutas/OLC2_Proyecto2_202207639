@@ -33,7 +33,9 @@ export const registers = {
     //T6: 't6',
     
     HP: 't6',
+}
 
+export const floatRegisters = {
     FT0: 'ft0',
     FT1: 'ft1',
     FT2: 'ft2',
@@ -42,7 +44,7 @@ export const registers = {
     FT5: 'ft5',
     FT6: 'ft6',
     FT7: 'ft7',
-    FS0: 'fs0',
+    FS0_FP: 'fs0/fp',
     FS1: 'fs1',
     FA0: 'fa0',
     FA1: 'fa1',

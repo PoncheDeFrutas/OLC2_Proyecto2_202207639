@@ -81,6 +81,23 @@ export class Generator {
     addi(rd, rs1, imm) {
         this.instrucctions.push(new Instruction('addi', rd, rs1, imm));
     }
+    
+    // Float Arithmetic Operations
+    fadd(rd, rs1, rs2) {
+        this.instrucctions.push(new Instruction('fadd.s', rd, rs1, rs2));
+    }
+    
+    fsub(rd, rs1, rs2) {
+        this.instrucctions.push(new Instruction('fsub.s', rd, rs1, rs2));
+    }
+    
+    fmul(rd, rs1, rs2) {
+        this.instrucctions.push(new Instruction('fmul.s', rd, rs1, rs2));
+    }
+    
+    fdiv(rd, rs1, rs2) {
+        this.instrucctions.push(new Instruction('fdiv.s', rd, rs1, rs2));
+    }
 
     // Store and Load
     sw(rs1, rs2, imm = 0) {
