@@ -235,7 +235,12 @@ export class CompilerVisitor extends BaseVisitor {
     visitVarDeclaration(node) {
         this.code.comment(`Variable declaration ${node.id}`);
         
-        node.value.accept(this);
+        if (node.value) {
+            node.value.accept(this);
+        } else {
+            const Literal = new nodes.Literal({type:node.type, value: 0})
+            Literal.accept(this);
+        }
         this.code.tagObject(node.id);
         
         this.code.comment(`Variable declaration ${node.id} end`);
