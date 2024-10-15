@@ -1,5 +1,5 @@
 import {registers as r} from "./constants.js";
-import {stringTo1ByteArray, stringTo32BitsArray} from "./utils.js";
+import {stringTo1ByteArray, floatToHex} from "./utils.js";
 import {builtin} from "./builtins.js";
 
 class Instruction {
@@ -29,6 +29,10 @@ export class Generator {
         this._usedBuiltins = new Set();
         this.breakLabel = [];
         this.continueLabel = [];
+    }
+    
+    getTopObject(first = true) {
+        return first ? this.objectStack[this.objectStack.length - 1] : this.objectStack[this.objectStack.length - 2];
     }
 
     getLabel() {
@@ -77,6 +81,10 @@ export class Generator {
     rem(rd, rs1, rs2) {
         this.instrucctions.push(new Instruction('rem', rd, rs1, rs2));
     }
+    
+    neg(rd, rs1) {
+        this.instrucctions.push(new Instruction('neg', rd, rs1));
+    }
 
     addi(rd, rs1, imm) {
         this.instrucctions.push(new Instruction('addi', rd, rs1, imm));
@@ -98,30 +106,35 @@ export class Generator {
     fdiv(rd, rs1, rs2) {
         this.instrucctions.push(new Instruction('fdiv.s', rd, rs1, rs2));
     }
-
-    // Store and Load
-    sw(rs1, rs2, imm = 0) {
-        this.instrucctions.push(new Instruction('sw', rs1, `${imm}(${rs2})`));
+    
+    fneg(rd, rs1) {
+        this.instrucctions.push(new Instruction('fneg.s', rd, rs1));
+    }
+    
+    // Relational Operations
+    slt(rd, rs1, rs2) {
+        this.instrucctions.push(new Instruction('slt', rd, rs1, rs2));
     }
 
-    sb(rs1, rs2, imm = 0) {
-        this.instrucctions.push(new Instruction('sb', rs1, `${imm}(${rs2})`));
+    sltu(rd, rs1, rs2) {
+        this.instrucctions.push(new Instruction('sltu', rd, rs1, rs2));
     }
 
-    lw(rd, rs1, imm = 0) {
-        this.instrucctions.push(new Instruction('lw', rd, `${imm}(${rs1})`));
+    sltiu(rd, rs1, imm) {
+        this.instrucctions.push(new Instruction('sltiu', rd, rs1, imm));
     }
-
-    lb(rd, rs1, imm = 0) {
-        this.instrucctions.push(new Instruction('lb', rd, `${imm}(${rs1})`));
+    
+    // Float Relational Operations
+    flt(rd, rs1, rs2) {
+        this.instrucctions.push(new Instruction('flt.s', rd, rs1, rs2));
     }
-
-    la(rd, label) {
-        this.instrucctions.push(new Instruction('la', rd, label));
+    
+    fle(rd, rs1, rs2) {
+        this.instrucctions.push(new Instruction('fle.s', rd, rs1, rs2));
     }
-
-    li(rd, imm) {
-        this.instrucctions.push(new Instruction('li', rd, imm));
+    
+    feq(rd, rs1, rs2) {
+        this.instrucctions.push(new Instruction('feq.s', rd, rs1, rs2));
     }
 
     // Logical Operations
@@ -149,6 +162,56 @@ export class Generator {
         this.instrucctions.push(new Instruction('andi', rd, rs1, imm));
     }
 
+    // Store and Load
+    sw(rs1, rs2, imm = 0) {
+        this.instrucctions.push(new Instruction('sw', rs1, `${imm}(${rs2})`));
+    }
+
+    sb(rs1, rs2, imm = 0) {
+        this.instrucctions.push(new Instruction('sb', rs1, `${imm}(${rs2})`));
+    }
+
+    lw(rd, rs1, imm = 0) {
+        this.instrucctions.push(new Instruction('lw', rd, `${imm}(${rs1})`));
+    }
+
+    lb(rd, rs1, imm = 0) {
+        this.instrucctions.push(new Instruction('lb', rd, `${imm}(${rs1})`));
+    }
+
+    la(rd, label) {
+        this.instrucctions.push(new Instruction('la', rd, label));
+    }
+
+    li(rd, imm) {
+        this.instrucctions.push(new Instruction('li', rd, imm));
+    }
+    
+    // Store and Load Float
+    fsw(rs1, rs2, imm = 0) {
+        this.instrucctions.push(new Instruction('fsw', rs1, `${imm}(${rs2})`));
+    }
+    
+    flw(rd, rs1, imm = 0) {
+        this.instrucctions.push(new Instruction('flw', rd, `${imm}(${rs1})`));
+    }
+
+    fcvtsw(rd, rs1) {
+        this.instrucctions.push(new Instruction('fcvt.s.w', rd, rs1));
+    }
+    
+    fcvtws(rd, rs1) {
+        this.instrucctions.push(new Instruction('fcvt.w.s', rd, rs1));
+    }
+    
+    fmv(rd, rs1) {
+        this.instrucctions.push(new Instruction('fmv', rd, rs1));
+    }
+    
+    fli(rd, imm) {
+        this.instrucctions.push(new Instruction('fli', rd, imm));
+    }
+
     // Conditional Branches
     beq(rs1, rs2, label) {
         this.instrucctions.push(new Instruction('beq', rs1, rs2, label));
@@ -158,18 +221,15 @@ export class Generator {
         this.instrucctions.push(new Instruction('bne', rs1, rs2, label));
     }
 
-    blt(rs1, rs2, label) {
-        this.instrucctions.push(new Instruction('blt', rs1, rs2, label));
-    }
-
-    bge(rs1, rs2, label) {
-        this.instrucctions.push(new Instruction('bge', rs1, rs2, label));
-    }
-
     // Push and Pop
     push(rd = r.T0) {
         this.addi(r.SP, r.SP, -4);
         this.sw(rd, r.SP);
+    }
+    
+    pushFloat(rd = r.FT0) {
+        this.addi(r.SP, r.SP, -4);
+        this.fsw(rd, r.SP);
     }
 
     pushConstant(object) {
@@ -184,6 +244,9 @@ export class Generator {
                 break;
             case 'char':
                 value = object.value.charCodeAt(0);
+                break;
+            case 'float':
+                value = floatToHex(object.value);
                 break;
             case 'string':
                 const stringArray = stringTo1ByteArray(object.value);
@@ -208,7 +271,6 @@ export class Generator {
         this.pushObject({type: object.type, length, depth: this.depth});
     }
 
-
     pushObject(object) {
         this.objectStack.push(object);
     }
@@ -217,10 +279,16 @@ export class Generator {
         this.lw(rd, r.SP);
         this.addi(r.SP, r.SP, 4);
     }
+    
+    popFloat(rd = r.FT0) {
+        this.flw(rd, r.SP);
+        this.addi(r.SP, r.SP, 4);
+    }
 
     popObject(rd = r.T0) {
-        this.pop(rd);
-        return this.objectStack.pop();
+        const object = this.objectStack.pop();
+        object.type !== 'float' ? this.pop(rd) : this.popFloat(rd);
+        return object;
     }
 
     // Function calls

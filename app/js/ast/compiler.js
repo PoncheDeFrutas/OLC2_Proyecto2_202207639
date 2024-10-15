@@ -1,6 +1,9 @@
 import {BaseVisitor} from "./visitor.js";
 import {Generator} from "../compiler/risc/generator.js";
 import {registers as r} from "../compiler/risc/constants.js";
+import nodes from "./nodes.js";
+import {handlePopObject} from "../compiler/risc/utils.js";
+
 
 export class CompilerVisitor extends BaseVisitor {
 
@@ -14,7 +17,7 @@ export class CompilerVisitor extends BaseVisitor {
      */
     visitExpressionStatement(node) {
         node.exp.accept(this);
-        this.code.popObject();
+        handlePopObject(this.code, r.T0, r.FT0);
     }
 
     /**
@@ -44,14 +47,15 @@ export class CompilerVisitor extends BaseVisitor {
             'bool': () => this.code.printInt(),
             'char': () => this.code.printChar(),
             'string': () => this.code.printString(),
+            'float': () => this.code.printFloat(),
         }
         
         node.exp.forEach(exp => {
            exp.accept(this);
-           const object = this.code.popObject(r.A0);
+           const object = handlePopObject(this.code, r.A0, r.FA0);
            print[object.type]();
-           
         });
+        
         this.code.li(r.A0, 10);
         this.code.li(r.A7, 11);
         this.code.ecall();
@@ -65,33 +69,55 @@ export class CompilerVisitor extends BaseVisitor {
      */
     visitArithmetic(node) {
         this.code.comment(`Arithmetic ${node.op}`);
-        
+
         node.left.accept(this);
         node.right.accept(this);
 
-        const right = this.code.popObject(r.T0);
-        const left = this.code.popObject(r.T1);
+        const right = handlePopObject(this.code, r.T1, r.FT1);
+        const left = handlePopObject(this.code, r.T0, r.FT0);
 
         if (left.type === 'string' && right.type === 'string') {
-            this.code.add(r.A0, r.ZERO, r.T1);
-            this.code.add(r.A1, r.ZERO, r.T0);
             this.code.callBuiltin('concatString');
             this.code.pushObject({type: 'string', length: 4});
             return null;
         }
 
-        const ops = {
-            '+': () => this.code.add(r.T0, r.T1, r.T0),
-            '-': () => this.code.sub(r.T0, r.T1, r.T0),
-            '*': () => this.code.mul(r.T0, r.T1, r.T0),
-            '/': () => this.code.div(r.T0, r.T1, r.T0),
-            '%': () => this.code.rem(r.T0, r.T1, r.T0),
+        const isFloatOp = left.type === 'float' || right.type === 'float';
+
+        if (isFloatOp) {
+            if (!right.type) this.code.fcvtsw(r.FT0, r.T0);
+            if (!left.type) this.code.fcvtsw(r.FT1, r.T1);
+        }
+
+        const performOperation = (opMap) => {
+            if (opMap[node.op]) {
+                opMap[node.op]();
+            } else {
+                throw new Error(`Unsupported operation: ${node.op}`);
+            }
         };
-        
-        ops[node.op]();
-        this.code.push();
-        this.code.pushObject({type: left.type, length: 4});
+
+        const floatOps = {
+            '+': () => this.code.callBuiltin('addFloat'),
+            '-': () => this.code.callBuiltin('subFloat'),
+            '*': () => this.code.callBuiltin('mulFloat'),
+            '/': () => this.code.callBuiltin('divFloat'),
+            '%': () => this.code.callBuiltin('remFloat'),
+        };
+
+        const intOps = {
+            '+': () => this.code.callBuiltin('addInt'),
+            '-': () => this.code.callBuiltin('subInt'),
+            '*': () => this.code.callBuiltin('mulInt'),
+            '/': () => this.code.callBuiltin('divInt'),
+            '%': () => this.code.callBuiltin('remInt'),
+        };
+
+        performOperation(isFloatOp ? floatOps : intOps);
+
+        this.code.pushObject({type: isFloatOp ? 'float' : left.type, length: 4});
     }
+
 
     /**
      * @type [BaseVisitor['visitRelational']]
@@ -99,55 +125,61 @@ export class CompilerVisitor extends BaseVisitor {
     visitRelational(node) {
         this.code.comment(`Relational ${node.op}`);
 
-        const labels = {
-            aux: this.code.getLabel(),
-            end: this.code.getLabel(),
-        };
-
         node.left.accept(this);
         node.right.accept(this);
 
-        const right = this.code.popObject(r.T0);
-        const left = this.code.popObject(r.T1);
+        const right = handlePopObject(this.code, r.T1, r.FT1);
+        const left = handlePopObject(this.code, r.T0, r.FT0);
 
         if (left.type === 'string' && right.type === 'string') {
-            this.code.add(r.A0, r.ZERO, r.T1);
-            this.code.add(r.A1, r.ZERO, r.T0);
             this.code.callBuiltin('compareString');
 
             const stringOps = {
-                '==': () => this.code.beq(r.T0, r.ZERO, labels.aux),
-                '!=': () => this.code.bne(r.T0, r.ZERO, labels.aux),
+                '==': () => this.code.sltu(r.T0, r.ZERO, r.T0),
+                '!=': () => this.code.sltiu(r.T0, r.T0, 1),
             };
 
             stringOps[node.op]();
         } else {
-            const ops = {
-                '<': () => this.code.blt(r.T1, r.T0, labels.aux),
-                '>': () => this.code.blt(r.T0, r.T1, labels.aux),
-                '<=': () => this.code.bge(r.T0, r.T1, labels.aux),
-                '>=': () => this.code.bge(r.T1, r.T0, labels.aux),
-                '==': () => this.code.beq(r.T0, r.T1, labels.aux),
-                '!=': () => this.code.bne(r.T0, r.T1, labels.aux),
+            const isFloatOp = left.type === 'float' || right.type === 'float';
+
+            if (isFloatOp) {
+                if (!right.type) this.code.fcvtsw(r.FT0, r.T0);
+                if (!left.type) this.code.fcvtsw(r.FT1, r.T1);
+            }
+
+            const performRelationalOperation = (opMap) => {
+                if (opMap[node.op]) {
+                    opMap[node.op]();
+                } else {
+                    throw new Error(`Unsupported relational operation: ${node.op}`);
+                }
             };
 
-            ops[node.op]();
+            const floatOps = {
+                '<': () => this.code.callBuiltin('lessThanFloat'),
+                '>': () => this.code.callBuiltin('greaterThanFloat'),
+                '<=': () => this.code.callBuiltin('lessEqualFloat'),
+                '>=': () => this.code.callBuiltin('greaterEqualFloat'),
+                '==': () => this.code.callBuiltin('equalFloat'),
+                '!=': () => this.code.callBuiltin('notEqualFloat'),
+            };
+
+            const intOps = {
+                '<': () => this.code.callBuiltin('lessThanInt'),
+                '>': () => this.code.callBuiltin('greaterThanInt'),
+                '<=': () => this.code.callBuiltin('lessEqualInt'),
+                '>=': () => this.code.callBuiltin('greaterEqualInt'),
+                '==': () => this.code.callBuiltin('equalInt'),
+                '!=': () => this.code.callBuiltin('notEqualInt'),
+            };
+
+            performRelationalOperation(isFloatOp ? floatOps : intOps);
         }
 
-        this.code.li(r.T0, 0);
-        this.code.push();
-        this.code.j(labels.end);
-
-        this.code.addLabel(labels.aux);
-        this.code.li(r.T0, 1);
-        this.code.push();
-
-        this.code.addLabel(labels.end);
         this.code.pushObject({ type: 'bool', length: 4 });
-
         this.code.comment(`Relational ${node.op} end`);
     }
-
 
     /**
      * @type [BaseVisitor['visitLogical']]
@@ -155,33 +187,19 @@ export class CompilerVisitor extends BaseVisitor {
     visitLogical(node) {
         this.code.comment(`Logical ${node.op}`);
 
-        const labels = {
-            aux: this.code.getLabel(),
-            end: this.code.getLabel(),
+        node.left.accept(this);
+        node.right.accept(this);
+
+        this.code.popObject(r.T0);
+        this.code.popObject(r.T1);
+        
+        const ops = {
+            '&&': () => this.code.callBuiltin('andInt'),
+            '||': () => this.code.callBuiltin('orInt'),
         };
 
-        node.left.accept(this);
-        this.code.popObject();
-
-        const isAnd = node.op === '&&';
-        const branch = isAnd ? this.code.beq : this.code.bne;
-
-        branch.call(this.code, r.T0, r.ZERO, labels.aux);
-
-        node.right.accept(this);
-        this.code.popObject();
-
-        branch.call(this.code, r.T0, r.ZERO, labels.aux);
-
-        this.code.li(r.T0, isAnd ? 1 : 0);
-        this.code.push();
-        this.code.j(labels.end);
-
-        this.code.addLabel(labels.aux);
-        this.code.li(r.T0, isAnd ? 0 : 1);
-        this.code.push();
-
-        this.code.addLabel(labels.end);
+        ops[node.op]();
+        
         this.code.pushObject({type: 'bool', length: 4});
 
         this.code.comment(`Logical ${node.op} end`);
@@ -194,20 +212,21 @@ export class CompilerVisitor extends BaseVisitor {
         this.code.comment(`Unary ${node.op}`);
         
         node.exp.accept(this);
-        this.code.popObject();
+        const object = handlePopObject(this.code, r.T0, r.FT0);
         
         const ops = {
-            '-': () => this.code.sub(r.T0, r.ZERO, r.T0),
-            '!': () => this.code.xori(r.T0, r.T0, 1),
+            '-': () => this.code.callBuiltin('negInt'),
+            '!': () => this.code.callBuiltin('negBool'),
         };
         
-        ops[node.op]();
-        this.code.push();
+        if (object.type === 'float') {
+            this.code.callBuiltin('negFloat');
+        } else {
+            ops[node.op]();
+        }
         
-        const resultType = (node.op === '-') ? 'int' : 'bool';
-        this.code.pushObject({type: resultType, length: 4});
+        this.code.pushObject(object);
         this.code.comment(`Unary ${node.op} end`);
-        
     }
 
     /**
@@ -229,16 +248,22 @@ export class CompilerVisitor extends BaseVisitor {
         this.code.comment(`Variable assign ${node.id}`);
 
         node.assign.accept(this);
-        const value = this.code.popObject();
+        const value = handlePopObject(this.code, r.T0, r.FT0);
         const [offset, object] = this.code.getObject(node.id);
 
         this.code.addi(r.T1, r.SP, offset);
 
-        this.code.sw(r.T0, r.T1);
+        if(object.type !== 'float' ) {
+            this.code.sw(r.T0, r.T1)
+            this.code.push();
+        } else {
+            if (value.type !== 'float') {
+                this.code.fcvtsw(r.FT0, r.T0);
+            }
+            this.code.fsw(r.FT0, r.T1);
+            this.code.pushFloat();
+        }
         
-        object.type = value.type;
-
-        this.code.push();
         this.code.pushObject(object);
 
         this.code.comment(`Variable assign ${node.id} end`);
@@ -252,8 +277,14 @@ export class CompilerVisitor extends BaseVisitor {
         
         const [offset, object] = this.code.getObject(node.id);
         this.code.addi(r.T0, r.SP, offset);
-        this.code.lw(r.T1, r.T0);
-        this.code.push(r.T1);
+        if (object.type !== 'float') {
+            this.code.lw(r.T1, r.T0);
+            this.code.push(r.T1);
+        } else {
+            this.code.flw(r.FT0, r.T0);
+            this.code.pushFloat();
+        }
+        
         this.code.pushObject({...object, id:undefined});
 
         this.code.comment(`Variable value ${node.id} end`);
@@ -420,10 +451,7 @@ export class CompilerVisitor extends BaseVisitor {
      */
     visitSwitch(node) {
         this.code.comment(`Switch statement`);
-
-        node.cond.accept(this);
-        this.code.popObject(r.T1);
-
+        
         const caseLabels = node.cases.map(() => this.code.getLabel());
         const defaultLabel = node.def ? this.code.getLabel() : null;
         const endLabel = this.code.getLabel();
@@ -431,10 +459,10 @@ export class CompilerVisitor extends BaseVisitor {
         this.code.pushBreakLabel(endLabel);
 
         node.cases.forEach((Case, i) => {
-            Case.cond.accept(this);
-            this.code.popObject(r.T0);
-
-            this.code.beq(r.T1, r.T0, caseLabels[i]);
+            const condition = new nodes.Relational({op: "==", left: node.cond, right: Case.cond});
+            condition.accept(this);
+            this.code.popObject();
+            this.code.bne(r.T0, r.ZERO, caseLabels[i]);
         });
 
         if (defaultLabel) {
@@ -445,7 +473,7 @@ export class CompilerVisitor extends BaseVisitor {
 
         node.cases.forEach((Case, index) => {
             this.code.addLabel(caseLabels[index]);
-            this.visitCase(Case);
+            Case.accept(this);
         });
 
         if (defaultLabel) {

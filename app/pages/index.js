@@ -44,7 +44,7 @@ function executeCode() {
         });
     }
 
-    let message = "Ejecución terminada.";
+    let message = "#Ejecución terminada.";
     if (errorMessages.length > 0) {
         message = "Errores encontrados:\n" + errorMessages.map(e => e.fullMessage).join('\n');
     }
