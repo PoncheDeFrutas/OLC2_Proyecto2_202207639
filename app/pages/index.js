@@ -1,11 +1,57 @@
+import { parse } from "../js/grammar/analyzer.js";
+import {CompilerVisitor} from "../js/ast/compiler.js";
+
 function executeCode() {
     const code = editor.getValue();
 
+    const infoArea = document.getElementById('info-area');
+    if (infoArea) {
+        infoArea.value = "";
+    }
+    
+    let errorMessages = [];
+    let interpreter = new CompilerVisitor();
+
     try {
-        console.log(code);
+        const exp = parse(code);
+
+        for (let i = 0; i < exp.length; i++) {
+            try {
+                if (exp[i] !== undefined) {
+                    exp[i].accept(interpreter);
+                }
+            } catch (error) {
+                let errorMessage = `Error capturado en el elemento ${i}: ${error.message}`;
+                if (error.location) {
+                    errorMessage += ` at line ${error.location.start.line}, column ${error.location.start.column}`;
+                }
+                errorMessages.push({
+                    fullMessage: errorMessage,
+                    messageWithoutLocation: error.message,
+                    location: error.location
+                });
+            }
+        }
     } catch (error) {
-        console.error("Error ejecutando el código:", error);
-        alert("Error ejecutando el código: " + error.message);
+        let errorMessage = error.message;
+        if (error.location) {
+            errorMessage += ` at line ${error.location.start.line}, column ${error.location.start.column}`;
+        }
+        errorMessages.push({
+            fullMessage: errorMessage,
+            messageWithoutLocation: error.message,
+            location: error.location
+        });
+    }
+
+    let message = "#Ejecución terminada.";
+    if (errorMessages.length > 0) {
+        message = "Errores encontrados:\n" + errorMessages.map(e => e.fullMessage).join('\n');
+    }
+
+    const consoleOutput = interpreter?.code.toString() || "";
+    if (infoArea) {
+        infoArea.value = `${consoleOutput}\n${message}\n`;
     }
 }
 
