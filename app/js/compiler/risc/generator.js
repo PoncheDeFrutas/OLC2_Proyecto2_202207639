@@ -163,6 +163,10 @@ export class Generator {
     }
 
     // Store and Load
+    mv(rd, rs1) {
+        this.instrucctions.push(new Instruction('mv', rd, rs1));
+    }
+    
     sw(rs1, rs2, imm = 0) {
         this.instrucctions.push(new Instruction('sw', rs1, `${imm}(${rs2})`));
     }
@@ -178,9 +182,21 @@ export class Generator {
     lb(rd, rs1, imm = 0) {
         this.instrucctions.push(new Instruction('lb', rd, `${imm}(${rs1})`));
     }
+    
+    lbu(rd, rs1, imm = 0) {
+        this.instrucctions.push(new Instruction('lbu', rd, `${imm}(${rs1})`));
+    }
 
     la(rd, label) {
         this.instrucctions.push(new Instruction('la', rd, label));
+    }
+    
+    srli(rd, rs1, imm) {
+        this.instrucctions.push(new Instruction('srli', rd, rs1, imm));
+    }
+    
+    slli(rd, rs1, imm) {
+        this.instrucctions.push(new Instruction('slli', rd, rs1, imm));
     }
 
     li(rd, imm) {
@@ -206,6 +222,14 @@ export class Generator {
     
     fmv(rd, rs1) {
         this.instrucctions.push(new Instruction('fmv', rd, rs1));
+    }
+    
+    fmvxw(rd, rs1) {
+        this.instrucctions.push(new Instruction('fmv.x.w', rd, rs1));
+    }
+    
+    fmvwx(rd, rs1) {
+        this.instrucctions.push(new Instruction('fmv.w.x', rd, rs1));
     }
     
     fli(rd, imm) {
@@ -272,7 +296,7 @@ export class Generator {
     }
 
     pushObject(object) {
-        this.objectStack.push(object);
+        this.objectStack.push({...object, depth:this.depth});
     }
 
     pop(rd = r.T0) {

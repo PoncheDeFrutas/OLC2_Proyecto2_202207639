@@ -56,9 +56,7 @@ export class CompilerVisitor extends BaseVisitor {
            print[object.type]();
         });
         
-        this.code.li(r.A0, 10);
-        this.code.li(r.A7, 11);
-        this.code.ecall();
+        this.code.callBuiltin('jump');
 
         this.code.comment(`Print end`);
     }
@@ -85,8 +83,8 @@ export class CompilerVisitor extends BaseVisitor {
         const isFloatOp = left.type === 'float' || right.type === 'float';
 
         if (isFloatOp) {
-            if (!right.type) this.code.fcvtsw(r.FT0, r.T0);
-            if (!left.type) this.code.fcvtsw(r.FT1, r.T1);
+            if (right.type !== 'float') this.code.fcvtsw(r.FT1, r.T1);
+            if (left.type !== 'float') this.code.fcvtsw(r.FT0, r.T0);
         }
 
         const performOperation = (opMap) => {
@@ -144,8 +142,8 @@ export class CompilerVisitor extends BaseVisitor {
             const isFloatOp = left.type === 'float' || right.type === 'float';
 
             if (isFloatOp) {
-                if (!right.type) this.code.fcvtsw(r.FT0, r.T0);
-                if (!left.type) this.code.fcvtsw(r.FT1, r.T1);
+                if (!right.type) this.code.fcvtsw(r.FT1, r.T1);
+                if (!left.type) this.code.fcvtsw(r.FT0, r.T0);
             }
 
             const performRelationalOperation = (opMap) => {
@@ -491,5 +489,74 @@ export class CompilerVisitor extends BaseVisitor {
 
         this.code.comment(`Switch statement end`);
     }
-    
+
+    /**
+     * @type [BaseVisitor['visitArrayInstance']]
+     */
+    visitArrayInstance(node) {
+        this.code.comment(`Array instance`);
+        let dim;
+        if (node.type && node.dim) {
+            dim = node.dim[0].value
+            for (let i = 0; i < node.dim[0].value; i++) {
+                const Literal = new nodes.Literal({type:node.type, value: 0})
+                Literal.accept(this);
+            }
+        } else {
+            node.args.reverse().forEach(arg => {
+                arg.accept(this);
+            });
+            dim = node.args.length;
+        }
+        this.code.mv(r.T2, r.HP);
+
+        for (let i = 0; i < dim; i++) {
+            this.code.objectStack.pop();
+            this.code.pop();
+            this.code.callBuiltin('instance');
+        }
+
+        this.code.push(r.T2);
+        this.code.pushObject({type: 'vec' + (node.type || node.args[0].type), length: 4 });
+        this.code.comment(`Array instance end`);
+    }
+
+    /**
+     * @type [BaseVisitor['visitGet']]
+     */
+    visitGet(node) {
+        this.code.comment(`Get`);
+
+        node.object.accept(this);
+        node.property.accept(this);
+
+        this.code.popObject(r.T1);
+        const object = this.code.popObject();
+
+        this.code.callBuiltin('getElement');
+
+        this.code.pushObject({type: object.type.slice(3), length:4 })
+
+        this.code.comment(`Get end`);
+    }
+
+    /**
+     * @type [BaseVisitor['visitGet']]
+     */
+    visitSet(node) {
+        this.code.comment(`Get`);
+
+        node.object.accept(this);
+        node.property.accept(this);
+        node.value.accept(this);
+
+        const result = this.code.popObject(r.T2);
+        this.code.popObject(r.T1);
+        this.code.popObject();
+
+        this.code.callBuiltin('setElement');
+
+        this.code.pushObject(result);
+        this.code.comment(`Get end`);
+    }
 }

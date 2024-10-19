@@ -946,7 +946,7 @@ export class Get extends Expression {
 
         /**
          * The property to get.
-         * @type {string}
+         * @type {Expression}
         */
         this.property = property;
 

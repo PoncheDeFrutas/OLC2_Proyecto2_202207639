@@ -389,20 +389,16 @@ function peg$parse(input, options) {
         return [arg, ...args]
     };
   var peg$f31 = function(id, sig, assign) {
+        let op = assign;
+        if (sig === '+=') {
+            op = createNode('Arithmetic', { op: '+', left: id, right: assign })
+        } else if (sig === '-=') {
+            op = createNode('Arithmetic', { op: '-', left: id, right: assign })
+        }
         if (id instanceof nodes.VarValue) {
-            if (sig === '=') {
-                return createNode('VarAssign', { id: id.id, assign })
-            } else {
-                let op;
-                if (sig === '+=') {
-                    op = createNode('Arithmetic', { op: '+', left: id, right: assign })
-                } else {
-                    op = createNode('Arithmetic', { op: '-', left: id, right: assign })
-                }
-                return createNode('VarAssign', { id: id.id, assign: op })
-            }
+            return createNode('VarAssign', { id: id.id, assign: op })
         } else if (id instanceof nodes.Get) {
-            return createNode('Set', { object: id.object, property: id.property, value: assign, sig })
+            return createNode('Set', { object: id.object, property: id.property, value: op})
         }
     };
   var peg$f32 = function(cond, trueExp, falseExp) {

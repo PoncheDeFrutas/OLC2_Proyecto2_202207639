@@ -4,6 +4,16 @@ import { Generator } from "./generator.js";
 /**
  * @param {Generator} code
  */
+export const jump = (code) => {
+    code.comment(`Jump to address`);
+    code.li(r.A0, 10);
+    code.li(r.A7, 11);
+    code.ecall();
+}
+
+/**
+ * @param {Generator} code
+ */
 export const concatString = (code) => {
     code.comment(`Concatenation of strings`);
 
@@ -327,8 +337,81 @@ export const orInt = (code) => {
     code.push();
 }
 
+/**
+ * @param {Generator} code
+ */
+export const getElement = (code) => {
+    code.comment(`Get element of array`);
+
+    const l1 = code.getLabel();
+    const l2 = code.getLabel();
+
+    code.add(r.A0, r.ZERO, r.T0);
+
+    code.addLabel(l1);
+    code.beq(r.T1, r.ZERO, l2);
+    code.addi(r.A0, r.A0, 4);
+    code.addi(r.T1, r.T1, -1);
+    code.j(l1);
+
+    code.addLabel(l2);
+    code.add(r.T2, r.ZERO, r.ZERO);
+
+    code.lbu(r.T3, r.A0);
+    code.or(r.T2, r.T2, r.T3);
+
+    for (let i = 1; i < 4; i++) {
+        code.addi(r.A0, r.A0, 1);
+        code.lbu(r.T3, r.A0);
+        code.slli(r.T3, r.T3, 8 * i);
+        code.or(r.T2, r.T2, r.T3);
+    }
+
+    code.mv(r.T0, r.T2);
+    code.push();
+}
+
+/**
+ * @param {Generator} code
+ */
+export const setElement = (code) => {
+    code.comment(`Set element of array`);
+
+    const l1 = code.getLabel();
+    const l2 = code.getLabel();
+
+    code.add(r.A0, r.ZERO, r.T0);
+
+    code.addLabel(l1);
+    code.beq(r.T1, r.ZERO, l2);
+    code.addi(r.A0, r.A0, 4);
+    code.addi(r.T1, r.T1, -1);
+    code.j(l1);
+
+    code.addLabel(l2);
+
+    for (let i = 0; i < 4; i++) {
+        code.srli(r.T1, r.T2, i*8);
+        code.sb(r.T1, r.A0, i);
+    }
+
+    code.push(r.T2);
+}
+
+/**
+ * @param {Generator} code
+ */
+export const instance = (code) => {
+    for (let j = 0; j < 4; j++) {
+        code.srli(r.T1, r.T0, j*8);
+        code.sb(r.T1, r.HP, j);
+    }
+    code.addi(r.HP, r.HP, 4);
+}
+
 
 export const builtin = {
+    jump: jump,
     concatString: concatString,
     compareString: compareString,
     negBool: negBool,
@@ -357,5 +440,8 @@ export const builtin = {
     equalFloat: equalFloat,
     notEqualFloat: notEqualFloat,
     andInt: andInt,
-    orInt: orInt
+    orInt: orInt,
+    getElement: getElement,
+    setElement: setElement,
+    instance: instance,
 }
