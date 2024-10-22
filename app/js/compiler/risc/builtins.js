@@ -54,8 +54,8 @@ export const concatString = (code) => {
 export const compareString = (code) => {
     code.comment(`Comparison of strings`);
     
-    this.code.add(r.A0, r.ZERO, r.T0);
-    this.code.add(r.A1, r.ZERO, r.T1);
+    code.add(r.A0, r.ZERO, r.T0);
+    code.add(r.A1, r.ZERO, r.T1);
     
     const endLabel = code.getLabel();
     const equalLabel = code.getLabel();
@@ -158,7 +158,7 @@ export const negInt = (code) => {
  */
 export const addFloat = (code) => {
     code.comment(`Addition of floats`);
-    code.fadd(r.FT0, r.FT1, r.FT0);
+    code.fadd(r.FT0, r.FT0, r.FT1);
     code.pushFloat();
 }
 
@@ -167,7 +167,7 @@ export const addFloat = (code) => {
  */
 export const subFloat = (code) => {
     code.comment(`Subtraction of floats`);
-    code.fsub(r.FT0, r.FT1, r.FT0);
+    code.fsub(r.FT0, r.FT0, r.FT1);
     code.pushFloat();
 }
 
@@ -176,7 +176,7 @@ export const subFloat = (code) => {
  */
 export const mulFloat = (code) => {
     code.comment(`Multiplication of floats`);
-    code.fmul(r.FT0, r.FT1, r.FT0);
+    code.fmul(r.FT0, r.FT0, r.FT1);
     code.pushFloat();
 }
 
@@ -185,7 +185,7 @@ export const mulFloat = (code) => {
  */
 export const divFloat = (code) => {
     code.comment(`Division of floats`);
-    code.fdiv(r.FT0, r.FT1, r.FT0);
+    code.fdiv(r.FT0, r.FT0, r.FT1);
     code.pushFloat();
 }
 
@@ -220,7 +220,7 @@ export const lessThanInt = (code) => {
  */
 export const greaterThanInt = (code) => {
     code.comment(`Greater than comparison of integers`);
-    code.slt(r.T0, r.T0, r.T1);
+    code.slt(r.T0, r.T1, r.T0);
     code.push();
 }
 
@@ -229,7 +229,7 @@ export const greaterThanInt = (code) => {
  */
 export const lessEqualInt = (code) => {
     code.comment(`Less or equal comparison of integers`);
-    code.slt(r.T0, r.T0, r.T1);
+    code.slt(r.T0, r.T1, r.T0);
     code.xori(r.T0, r.T0, 1);
     code.push();
 }
@@ -269,7 +269,7 @@ export const notEqualInt = (code) => {
  */
 export const lessThanFloat = (code) => {
     code.comment(`Less than comparison of floats`);
-    code.flt(r.T0, r.FT1, r.FT0);
+    code.flt(r.T0, r.FT0, r.FT1);
     code.push();
 }
 
@@ -278,7 +278,7 @@ export const lessThanFloat = (code) => {
  */
 export const greaterThanFloat = (code) => {
     code.comment(`Greater than comparison of floats`);
-    code.flt(r.T0, r.FT0, r.FT1);
+    code.flt(r.T0, r.FT1, r.FT0);
     code.push();
 }
 
@@ -287,7 +287,7 @@ export const greaterThanFloat = (code) => {
  */
 export const lessEqualFloat = (code) => {
     code.comment(`Less or equal comparison of floats`);
-    code.fle(r.T0, r.FT1, r.FT0);
+    code.fle(r.T0, r.FT0, r.FT1);
     code.push();
 }
 
@@ -296,7 +296,7 @@ export const lessEqualFloat = (code) => {
  */
 export const greaterEqualFloat = (code) => {
     code.comment(`Greater or equal comparison of floats`);
-    code.fle(r.T0, r.FT0, r.FT1);
+    code.fle(r.T0, r.FT1, r.FT0);
     code.push();
 }
 
@@ -305,7 +305,7 @@ export const greaterEqualFloat = (code) => {
  */
 export const equalFloat = (code) => {
     code.comment(`Equal comparison of floats`);
-    code.feq(r.T0, r.FT1, r.FT0);
+    code.feq(r.T0, r.FT0, r.FT1);
     code.push();
 }
 
@@ -314,7 +314,7 @@ export const equalFloat = (code) => {
  */
 export const notEqualFloat = (code) => {
     code.comment(`Not equal comparison of floats`);
-    code.feq(r.T0, r.FT1, r.FT0);
+    code.feq(r.T0, r.FT0, r.FT1);
     code.xori(r.T0, r.T0, 1);
     code.push();
 }
@@ -409,6 +409,172 @@ export const instance = (code) => {
     code.addi(r.HP, r.HP, 4);
 }
 
+/**
+ * @param {Generator} code
+ */
+export const copyVector = (code) => {
+    code.push(r.HP);
+
+    const l1 = code.getLabel();
+    const l2 = code.getLabel();
+
+    code.add(r.A0, r.ZERO, r.T0);
+
+    code.addLabel(l1);
+    code.beq(r.T1, r.ZERO, l2);
+    code.lb(r.T2, r.A0)
+    code.sb(r.T2, r.HP);
+    code.addi(r.HP, r.HP, 1);
+    code.addi(r.A0, r.A0, 1);
+    code.addi(r.T1, r.T1, -1);
+    code.j(l1);
+
+    code.addLabel(l2);
+}
+
+/**
+ * @param {Generator} code
+ */
+export const indexOf = (code) => {
+    code.comment(`Get index of element in array`);
+
+    const l1 = code.getLabel();
+    const l2 = code.getLabel();
+    const l3 = code.getLabel();
+
+    code.add(r.T2, r.ZERO, r.ZERO);
+    code.add(r.A0, r.ZERO, r.T0);
+    code.add(r.T4, r.ZERO, r.ZERO);
+
+    code.addLabel(l1);
+
+    code.lbu(r.T2, r.A0, 0);
+
+    for (let i = 1; i < 4; i++) {
+        code.addi(r.A0, r.A0, 1);
+        code.lbu(r.T3, r.A0, 0);
+        code.slli(r.T3, r.T3, 8 * i);
+        code.or(r.T2, r.T2, r.T3);
+    }
+
+    code.beq(r.T2, r.T1, l2);
+
+    code.addi(r.A0, r.A0, 1);
+    code.addi(r.T4, r.T4, 1);
+
+    code.bne(r.T4, r.T5, l1);
+    code.j(l3);
+
+    code.addLabel(l2);
+    code.push(r.T4);
+    code.ret();
+
+    code.addLabel(l3);
+    code.li(r.T0, -1);
+    code.push(r.T0);
+}
+
+/**
+ * @param {Generator} code
+ */
+export const parseInt = (code) => {
+    code.comment(`Parse integer from string`);
+    
+    const l1 = code.getLabel();
+    const l2 = code.getLabel();
+    
+    code.add(r.A0, r.ZERO, r.T0);
+    code.li(r.T0, 0);
+    code.li(r.T1, 0);
+    code.li(r.T2, 46);
+    code.li(r.T3, 10)
+    
+    code.addLabel(l1);
+    code.lb(r.T1, r.A0);
+    code.beq(r.T1, r.ZERO, l2);
+    code.beq(r.T1, r.T2, l2);
+    code.addi(r.T1, r.T1, -48);
+    
+    code.mul(r.T0, r.T0, r.T3);
+    code.add(r.T0, r.T0, r.T1);
+    code.addi(r.A0, r.A0, 1);
+    code.j(l1);
+    
+    code.addLabel(l2);
+    code.push();
+}
+
+/**
+ * @param {Generator} code
+ */
+export const parsefloat = (code) => {
+    code.comment(`Parse Float from string`);
+
+    const l1 = code.getLabel();
+    const l2 = code.getLabel();
+    const l3 = code.getLabel();
+    
+    code.add(r.A0, r.ZERO, r.T0);
+    code.li(r.T0, 0);
+    code.li(r.T1, 0);
+    code.li(r.T2, 46);
+    code.li(r.T3, 10);
+    code.li(r.T4, 1);
+    code.fcvtsw(r.FT0, r.T0);
+    code.fcvtsw(r.FT2, r.T4);
+    code.fcvtsw(r.FT3, r.T3);
+
+    code.addLabel(l1);
+    code.lb(r.T1, r.A0);
+    code.addi(r.A0, r.A0, 1);
+    code.beq(r.T1, r.ZERO, l3);
+    code.beq(r.T1, r.T2, l2);
+    code.addi(r.T1, r.T1, -48);
+
+    code.fcvtsw(r.FT1, r.T1);
+    code.fmul(r.FT0, r.FT0, r.FT3);
+    code.fadd(r.FT0, r.FT0, r.FT1);
+    code.j(l1);
+
+    code.addLabel(l2);
+    code.lb(r.T1, r.A0);
+    code.addi(r.A0, r.A0, 1);
+    code.beq(r.T1, r.ZERO, l3);
+    code.addi(r.T1, r.T1, -48);
+    
+    code.fcvtsw(r.FT1, r.T1);
+    code.fmul(r.FT2, r.FT2, r.FT3);
+    code.fdiv(r.FT1, r.FT1, r.FT2);
+    code.fadd(r.FT0, r.FT0, r.FT1);
+    code.j(l2);
+    
+    code.addLabel(l3);
+    
+    code.pushFloat();
+}
+
+/**
+ * @param {Generator} code
+ */
+export const toString = (code) => {
+    code.push(r.HP);
+    
+    const l1 = code.getLabel();
+    const l2 = code.getLabel();
+    
+    code.mv(r.T2, r.T0);
+    code.li(r.T1, 0);
+    code.li(r.T3, 10);
+    
+    code.addLabel(l1);
+    code.div(r.T2, r.T2, r.T3);
+    code.addi(r.T1, r.T1, 1);
+    code.bne(r.T2, r.ZERO, l1);
+
+    code.addLabel(l2);
+
+}
+
 
 export const builtin = {
     jump: jump,
@@ -444,4 +610,8 @@ export const builtin = {
     getElement: getElement,
     setElement: setElement,
     instance: instance,
+    copyVector: copyVector,
+    indexOf: indexOf,
+    parseInt: parseInt,
+    parsefloat: parsefloat
 }

@@ -304,7 +304,7 @@ ArrMethods
 /* ------------------------------------------------------Callee------------------------------------------------------ */
 Callee = initial:DataType _ operations:(
         ("(" _ args:Arguments? _ ")" { return { type: 'call', args: args || [] } })
-        / ("." _ id:("length"/ArrayMethods/Id/Callee) { return { type: 'access', id } })
+        / ("." _ id:(ArrayMethods/Id/Callee) { return { type: 'access', id } })
         / ("[" _ index:Expression _ "]" { return { type: 'index', index } })
     )* {
         return operations.reduce(
@@ -338,6 +338,7 @@ DataType
     / Instance
     / typeof
     / IdValue
+    / ArrayMethods
 
 ArrayInstance
     = "{" _ args:Arguments _  "}" {
@@ -364,8 +365,7 @@ Attribute
 
 ArrayMethods
     = method:("indexOf"/"length"/"join") exp:( "(" _ arg:Expression? _ ")" { return arg })? {
-        const varValue = createNode('VarValue', { id:method })
-        return createNode('Callee', { callee: varValue, args: exp ? [exp] : [] })
+        return createNode('Callee', { callee: method, args: exp ? [exp] : [] })
     }
 
 typeof

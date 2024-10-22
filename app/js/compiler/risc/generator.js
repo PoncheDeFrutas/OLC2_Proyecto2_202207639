@@ -24,7 +24,8 @@ export class Generator {
         this.depth = 0;
         this.objectStack = [];
         this.instrucctions = [];
-
+        this.instrucionesDeFunciones = [];
+        
         this._labelCounter = 0;
         this._usedBuiltins = new Set();
         this.breakLabel = [];
@@ -231,10 +232,6 @@ export class Generator {
     fmvwx(rd, rs1) {
         this.instrucctions.push(new Instruction('fmv.w.x', rd, rs1));
     }
-    
-    fli(rd, imm) {
-        this.instrucctions.push(new Instruction('fli', rd, imm));
-    }
 
     // Conditional Branches
     beq(rs1, rs2, label) {
@@ -316,6 +313,10 @@ export class Generator {
     }
 
     // Function calls
+    jalr(rd, rs1, imm = 0) {
+        this.instrucctions.push(new Instruction('jalr', rd, rs1, imm));
+    }
+    
     jal(label) {
         this.instrucctions.push(new Instruction('jal', label));
     }
@@ -420,11 +421,22 @@ export class Generator {
         this.jal(name);
     }
 
+
+    getFrameLocal(index) {
+        const relative = this.objectStack.filter(obj => obj.type === 'local');
+        return relative[index];
+    }
+
     toString() {
         this.comment('End of program');
         this.endProgram();
+        
+        this.comment('Functions');
+        this.instrucionesDeFunciones.forEach(instruction => {
+            this.instrucctions.push(instruction);
+        })
+        
         this.comment('Builtins');
-
         Array.from(this._usedBuiltins).forEach(name => {
             this.addLabel(name);
             builtin[name](this);

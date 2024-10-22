@@ -3,6 +3,8 @@ import {Generator} from "../compiler/risc/generator.js";
 import {registers as r} from "../compiler/risc/constants.js";
 import nodes from "./nodes.js";
 import {handlePopObject} from "../compiler/risc/utils.js";
+import {builtin} from "../compiler/risc/builtins.js";
+import {FrameVisitor} from "../compiler/frame.js";
 
 
 export class CompilerVisitor extends BaseVisitor {
@@ -10,6 +12,11 @@ export class CompilerVisitor extends BaseVisitor {
     constructor() {
         super();
         this.code = new Generator();
+        
+        this.functionMetadata = {};
+        this.insideFunction = false;
+        this.frameDclIndex = 0;
+        this.returnLabel = null;
     }
 
     /**
@@ -138,12 +145,13 @@ export class CompilerVisitor extends BaseVisitor {
             };
 
             stringOps[node.op]();
+            this.code.push(r.T0);
         } else {
             const isFloatOp = left.type === 'float' || right.type === 'float';
 
             if (isFloatOp) {
-                if (!right.type) this.code.fcvtsw(r.FT1, r.T1);
-                if (!left.type) this.code.fcvtsw(r.FT0, r.T0);
+                if (right.type !== 'float') this.code.fcvtsw(r.FT1, r.T1);
+                if (left.type !== 'float') this.code.fcvtsw(r.FT0, r.T0);
             }
 
             const performRelationalOperation = (opMap) => {
@@ -235,10 +243,29 @@ export class CompilerVisitor extends BaseVisitor {
         
         if (node.value) {
             node.value.accept(this);
+            if (this.code.getTopObject().type.startsWith("vec") && node.value instanceof nodes.VarValue) {
+                const object = this.code.popObject();
+                this.code.li(r.T1, object.dim*4)
+                this.code.callBuiltin('copyVector');
+                this.code.pushObject(object);
+            }
         } else {
             const Literal = new nodes.Literal({type:node.type, value: 0})
             Literal.accept(this);
         }
+
+        if (this.insideFunction) {
+            const localObject = this.code.getFrameLocal(this.frameDclIndex);
+            const valueObj = this.code.popObject(r.T0);
+            
+            this.code.addi(r.T1, r.FP, -localObject.offset * 4);
+            this.code.sw(r.T0, r.T1);
+            
+            localObject.type = valueObj.type;
+            this.frameDclIndex++;
+            return null;
+        }
+        
         this.code.tagObject(node.id);
         
         this.code.comment(`Variable declaration ${node.id} end`);
@@ -254,6 +281,12 @@ export class CompilerVisitor extends BaseVisitor {
         const value = handlePopObject(this.code, r.T0, r.FT0);
         const [offset, object] = this.code.getObject(node.id);
 
+        if (this.insideFunction) {
+            this.code.addi(r.T1, r.FP, -object.offset *4);
+            this.code.sw(r.T0, r.T1);
+            return null;
+        }
+        
         this.code.addi(r.T1, r.SP, offset);
 
         if(object.type !== 'float' ) {
@@ -279,6 +312,15 @@ export class CompilerVisitor extends BaseVisitor {
         this.code.comment(`Variable value ${node.id}`);
         
         const [offset, object] = this.code.getObject(node.id);
+        
+        if (this.insideFunction) {
+            this.code.addi(r.T1, r.FP, -object.offset * 4);
+            this.code.lw(r.T0, r.T1);
+            this.code.push(r.T0);
+            this.code.pushObject({...object, id:undefined});
+            return null;
+        }
+        
         this.code.addi(r.T0, r.SP, offset);
         if (object.type !== 'float') {
             this.code.lw(r.T1, r.T0);
@@ -421,6 +463,41 @@ export class CompilerVisitor extends BaseVisitor {
     }
 
     /**
+     * @type [BaseVisitor['visitForEach']]
+     */
+    visitForEach(node) {
+        this.code.comment(`For each statement`);
+        
+        let literal = new nodes.Literal({type:'int', value:0});
+        const init = new nodes.VarDeclaration({type:'int', id:'cba', value:literal});
+        
+        const varValue = new nodes.VarValue({id:'cba'});
+        const callee = new nodes.Callee({callee:'length', args:[]});
+        const getLength = new nodes.Get({object: node.array, property:callee});
+        const relational = new nodes.Relational({op:'<', left:varValue, right:getLength});
+
+        let literal2 = new nodes.Literal({type:'int', value:1});
+        const Arithmetic = new nodes.Arithmetic({op:'+', left:varValue, right:literal2});
+        const update = new nodes.VarAssign({id:'cba', sig:'=', assign:Arithmetic});
+        
+        const insideUpdate = new nodes.VarAssign({
+            id:node.vd.id,
+            sig:'=',
+            assign:new nodes.Get({object:node.array, property:varValue})
+        });
+
+        node.stmt.stmt.unshift(insideUpdate);
+
+        const baseFor = new nodes.For({init:init, cond:relational, update:update, stmt:node.stmt});
+        
+        this.code.newScope();
+        node.vd.accept(this);
+        this.visitFor(baseFor);
+        this.code.addi(r.SP, r.SP, this.code.endScope());
+        this.code.comment(`For statement end`);
+    }
+
+    /**
      * @type [BaseVisitor['visitBreak']]
      */
     visitBreak(node) {
@@ -445,7 +522,8 @@ export class CompilerVisitor extends BaseVisitor {
      */
     visitCase(node) {
         this.code.comment(`Case statement`)
-        node.stmt.forEach(stmt => stmt.accept(this));
+        const block = new nodes.Block({stmt:node.stmt});
+        block.accept(this);
         this.code.comment(`Case statement end`)
     }
 
@@ -517,7 +595,7 @@ export class CompilerVisitor extends BaseVisitor {
         }
 
         this.code.push(r.T2);
-        this.code.pushObject({type: 'vec' + (node.type || node.args[0].type), length: 4 });
+        this.code.pushObject({type: 'vec' + (node.type || node.args[0].type), length: 4, dim: dim});
         this.code.comment(`Array instance end`);
     }
 
@@ -528,15 +606,32 @@ export class CompilerVisitor extends BaseVisitor {
         this.code.comment(`Get`);
 
         node.object.accept(this);
-        node.property.accept(this);
+        if (node.property instanceof nodes.Callee) {
+            if (node.property.args[0]) {
+                node.property.args[0].accept(this);
+                this.code.popObject(r.T1);
+            }
+            const object = this.code.popObject(r.T0);
+            if (node.property.callee === 'indexOf') {
+                this.code.li(r.T5,  object.dim);
+                this.code.callBuiltin('indexOf');
+                this.code.pushObject({type: 'int', length:4 })
+            } else if (node.property.callee === 'length') {
+                this.code.li(r.T0,  object.dim);
+                this.code.push();
+                this.code.pushObject({type: 'int', length:4 })
+            } else if (node.property.callee === 'Join') {
 
-        this.code.popObject(r.T1);
-        const object = this.code.popObject();
+            }
+        } else {
+            node.property.accept(this);
+            this.code.popObject(r.T1);
+            const object = this.code.popObject();
 
-        this.code.callBuiltin('getElement');
+            this.code.callBuiltin('getElement');
 
-        this.code.pushObject({type: object.type.slice(3), length:4 })
-
+            this.code.pushObject({type: object.type.slice(3), length:4 })
+        }
         this.code.comment(`Get end`);
     }
 
@@ -549,7 +644,7 @@ export class CompilerVisitor extends BaseVisitor {
         node.object.accept(this);
         node.property.accept(this);
         node.value.accept(this);
-
+        
         const result = this.code.popObject(r.T2);
         this.code.popObject(r.T1);
         this.code.popObject();
@@ -558,5 +653,140 @@ export class CompilerVisitor extends BaseVisitor {
 
         this.code.pushObject(result);
         this.code.comment(`Get end`);
+    }
+
+    /**
+     * @type [BaseVisitor['visitFuncDeclaration']]
+     */
+    visitFuncDeclaration(node) {
+        const baseSize = 2;
+        
+        const paramSize = node.params.length;
+        
+        const frameVisitor = new FrameVisitor(baseSize + paramSize);
+        node.block.accept(frameVisitor);
+        const localFrame = frameVisitor.frame;
+        const localSize = localFrame.length;
+        
+        const returnSize = 1;
+        
+        const totalSize = baseSize + paramSize + localSize + returnSize;
+        this.functionMetadata[node.id] = {
+            frameSize: totalSize,
+            returnType: node.type,
+        };
+        
+        const instruccionesDeMain = this.code.instrucctions;
+        const instruccionesDeDeclaracionDeFuncion = []
+        this.code.instrucctions = instruccionesDeDeclaracionDeFuncion;
+        
+        node.params.forEach((param, i) => {
+            this.code.pushObject({
+                id: param.id,
+                type: param.type,
+                length: 4,
+                offset: baseSize + i
+            })
+        });
+        
+        localFrame.forEach((local, i) => {
+            this.code.pushObject({
+                ...local,
+                length:4,
+                type: 'local'
+            });
+        });
+        
+        this.insideFunction = node.id;
+        this.frameDclIndex = 0;
+        this.returnLabel = this.code.getLabel();
+        
+        this.code.comment(`Function ${node.id}`);
+        this.code.addLabel(node.id);
+        
+        node.block.accept(this);
+        
+        this.code.addLabel(this.returnLabel);
+        
+        this.code.add(r.T0, r.ZERO, r.FP);
+        this.code.lw(r.RA, r.T0)
+        this.code.jalr(r.ZERO, r.RA, 0);
+        this.code.comment(`Function ${node.id} end`);
+        
+        for (let i = 0; i < paramSize + localSize; i++) {
+            this.code.objectStack.pop();
+        }
+        
+        this.code.instrucctions = instruccionesDeMain
+        
+        instruccionesDeDeclaracionDeFuncion.forEach(ins => {
+            this.code.instrucionesDeFunciones.push(ins);
+        })
+    }
+
+    /**
+     * @type [BaseVisitor['visitCallee']]
+     */
+    visitCallee(node) {
+        if (!(node.callee instanceof nodes.VarValue)) return null;
+        
+        const nameFunction = node.callee.id;
+        
+        this.code.comment(`Callee ${nameFunction}`);
+        
+        const returnLabel = this.code.getLabel();
+        
+        node.args.forEach((arg, i) => {
+            arg.accept(this);
+            this.code.popObject(r.T0);
+            this.code.addi(r.T1, r.SP, -4*(3+i));
+            this.code.sw(r.T0, r.T1);
+        });
+        
+        this.code.addi(r.T1, r.SP, -4);
+        
+        this.code.la(r.T0, returnLabel);
+        this.code.push(r.T0);
+        
+        this.code.push(r.FP);
+        this.code.addi(r.FP, r.T1, 0);
+        
+        this.code.addi(r.SP, r.SP, -4 * node.args.length);
+        
+        this.code.j(nameFunction);
+        this.code.addLabel(returnLabel);
+        
+        const frameSize = this.functionMetadata[nameFunction].frameSize;
+        const returnSize = frameSize -1;
+        this.code.addi(r.T0, r.FP, -returnSize * 4);
+        this.code.lw(r.A0, r.T0);
+        
+        this.code.addi(r.T0, r.FP, -4);
+        this.code.lw(r.FP, r.T0);
+        
+        this.code.addi(r.SP, r.SP, (frameSize-1)*4);
+        
+        this.code.push(r.A0);
+        this.code.pushObject({type: this.functionMetadata[nameFunction].returnType, length: 4});
+        this.code.comment(`Callee ${nameFunction} end`);
+    }
+
+    /**
+     * @type [BaseVisitor['visitReturn']]
+     */
+    visitReturn(node) {
+        this.code.comment(`Return`);
+        
+        if (node.exp) {
+            node.exp.accept(this);
+            this.code.popObject(r.A0);
+            const frameSize = this.functionMetadata[this.insideFunction].frameSize;
+            const offset = frameSize -1;
+            this.code.addi(r.T0, r.FP, -offset * 4);
+            this.code.sw(r.A0, r.T0);
+        }
+        
+        this.code.j(this.returnLabel);
+        this.code.comment(`Return end`);
     }
 }

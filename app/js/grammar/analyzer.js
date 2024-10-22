@@ -507,8 +507,7 @@ function peg$parse(input, options) {
     };
   var peg$f60 = function(method, arg) { return arg };
   var peg$f61 = function(method, exp) {
-        const varValue = createNode('VarValue', { id:method })
-        return createNode('Callee', { callee: varValue, args: exp ? [exp] : [] })
+        return createNode('Callee', { callee: method, args: exp ? [exp] : [] })
     };
   var peg$f62 = function(id, exp) {
          const varValue = createNode('VarValue', { id })
@@ -2946,20 +2945,11 @@ function peg$parse(input, options) {
         }
         if (s5 !== peg$FAILED) {
           s6 = peg$parse_();
-          if (input.substr(peg$currPos, 6) === peg$c36) {
-            s7 = peg$c36;
-            peg$currPos += 6;
-          } else {
-            s7 = peg$FAILED;
-            if (peg$silentFails === 0) { peg$fail(peg$e39); }
-          }
+          s7 = peg$parseArrayMethods();
           if (s7 === peg$FAILED) {
-            s7 = peg$parseArrayMethods();
+            s7 = peg$parseId();
             if (s7 === peg$FAILED) {
-              s7 = peg$parseId();
-              if (s7 === peg$FAILED) {
-                s7 = peg$parseCallee();
-              }
+              s7 = peg$parseCallee();
             }
           }
           if (s7 !== peg$FAILED) {
@@ -3057,20 +3047,11 @@ function peg$parse(input, options) {
           }
           if (s5 !== peg$FAILED) {
             s6 = peg$parse_();
-            if (input.substr(peg$currPos, 6) === peg$c36) {
-              s7 = peg$c36;
-              peg$currPos += 6;
-            } else {
-              s7 = peg$FAILED;
-              if (peg$silentFails === 0) { peg$fail(peg$e39); }
-            }
+            s7 = peg$parseArrayMethods();
             if (s7 === peg$FAILED) {
-              s7 = peg$parseArrayMethods();
+              s7 = peg$parseId();
               if (s7 === peg$FAILED) {
-                s7 = peg$parseId();
-                if (s7 === peg$FAILED) {
-                  s7 = peg$parseCallee();
-                }
+                s7 = peg$parseCallee();
               }
             }
             if (s7 !== peg$FAILED) {
@@ -3155,6 +3136,9 @@ function peg$parse(input, options) {
                     s0 = peg$parsetypeof();
                     if (s0 === peg$FAILED) {
                       s0 = peg$parseIdValue();
+                      if (s0 === peg$FAILED) {
+                        s0 = peg$parseArrayMethods();
+                      }
                     }
                   }
                 }
