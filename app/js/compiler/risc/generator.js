@@ -241,6 +241,26 @@ export class Generator {
     bne(rs1, rs2, label) {
         this.instrucctions.push(new Instruction('bne', rs1, rs2, label));
     }
+    
+    blt(rs1, rs2, label) {
+        this.instrucctions.push(new Instruction('blt', rs1, rs2, label));
+    }
+    
+    bgt(rs1, rs2, label) {
+        this.instrucctions.push(new Instruction('bgt', rs1, rs2, label));
+    }
+    
+    bge(rs1, rs2, label) {
+        this.instrucctions.push(new Instruction('bge', rs1, rs2, label));
+    }
+    
+    beqz(rs1, label) {
+        this.instrucctions.push(new Instruction('beqz', rs1, label));
+    }
+    
+    bnez(rs1, label) {
+        this.instrucctions.push(new Instruction('bnez', rs1, label));
+    }
 
     // Push and Pop
     push(rd = r.T0) {
@@ -445,6 +465,14 @@ export class Generator {
 
         return `
 .data
+    int: .string "int\\0"
+    float: .string "float\\0"
+    string: .string "string\\0"
+    bool: .string "bool\\0"
+    char: .string "char\\0"
+    true: .string "true\\0"
+    false: .string "false\\0"
+    null: .string "null\\0"
     heap:
 .text
 # Initialize Heap Pointer

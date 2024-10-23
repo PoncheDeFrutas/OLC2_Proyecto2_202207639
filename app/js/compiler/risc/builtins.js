@@ -92,6 +92,97 @@ export const compareString = (code) => {
 /**
  * @param {Generator} code
  */
+export const toLowerCase = (code) => {
+    code.comment(`Lower case of character`);
+    code.push(r.HP);
+    
+    code.add(r.A0, r.ZERO, r.T0);
+    
+    const end = code.getLabel();
+    const loop = code.getLabel();
+    const noConvert = code.getLabel();
+    const convert = code.getLabel();
+    const nextChar = code.getLabel();
+    
+    code.addLabel(loop);
+    code.lb(r.T1, r.A0);
+    code.beq(r.T1, r.ZERO, end);
+    
+    code.li(r.T2, 65);
+    code.li(r.T3, 90);
+    
+    code.blt(r.T1, r.T2, noConvert);
+    code.bgt(r.T1, r.T3, noConvert);
+    
+    code.j(convert);
+    
+    code.addLabel(noConvert);
+    code.sb(r.T1, r.HP);
+    
+    code.addLabel(nextChar);
+    code.addi(r.HP, r.HP, 1);
+    code.addi(r.A0, r.A0, 1);
+    code.j(loop);
+    
+    code.addLabel(convert);
+    code.addi(r.T1, r.T1, 32);
+    code.sb(r.T1, r.HP);
+    
+    code.j(nextChar);
+    code.addLabel(end);
+    code.sb(r.ZERO, r.HP);
+    code.addi(r.HP, r.HP, 1);
+    
+    code.comment(`End of lower case conversion`);
+}
+
+/**
+ * @param {Generator} code
+ */
+export const toUpperCase = (code) => {
+    code.push(r.HP);
+
+    code.add(r.A0, r.ZERO, r.T0);
+
+    const end = code.getLabel();
+    const loop = code.getLabel();
+    const noConvert = code.getLabel();
+    const convert = code.getLabel();
+    const nextChar = code.getLabel();
+
+    code.addLabel(loop);
+    code.lb(r.T1, r.A0);
+    code.beq(r.T1, r.ZERO, end);
+
+    code.li(r.T2, 97);
+    code.li(r.T3, 122);
+
+    code.blt(r.T1, r.T2, noConvert);
+    code.bgt(r.T1, r.T3, noConvert);
+
+    code.j(convert);
+
+    code.addLabel(noConvert);
+    code.sb(r.T1, r.HP);
+
+    code.addLabel(nextChar);
+    code.addi(r.HP, r.HP, 1);
+    code.addi(r.A0, r.A0, 1);
+    code.j(loop);
+
+    code.addLabel(convert);
+    code.addi(r.T1, r.T1, -32);
+    code.sb(r.T1, r.HP);
+
+    code.j(nextChar);
+    code.addLabel(end);
+    code.sb(r.ZERO, r.HP);
+    code.addi(r.HP, r.HP, 1);
+}
+
+/**
+ * @param {Generator} code
+ */
 export const negBool = (code) => {
     code.comment(`Negation of booleans`);
     code.xori(r.T0, r.T0, 1);
@@ -556,25 +647,141 @@ export const parsefloat = (code) => {
 /**
  * @param {Generator} code
  */
-export const toString = (code) => {
-    code.push(r.HP);
-    
-    const l1 = code.getLabel();
-    const l2 = code.getLabel();
-    
-    code.mv(r.T2, r.T0);
-    code.li(r.T1, 0);
-    code.li(r.T3, 10);
-    
-    code.addLabel(l1);
-    code.div(r.T2, r.T2, r.T3);
-    code.addi(r.T1, r.T1, 1);
-    code.bne(r.T2, r.ZERO, l1);
-
-    code.addLabel(l2);
-
+export const typeoff = (code) => {
+    code.comment(`Get type of variable`);
+    code.push(r.A1);
 }
 
+/**
+ * @param {Generator} code
+ */
+export const printInt = (code) => {
+    code.li(r.A7, 1);
+    code.ecall();
+}
+
+/**
+ * @param {Generator} code
+ */
+export const printFloat = (code) => {
+    code.li(r.A7, 2);
+    code.ecall();
+}
+
+/**
+ * @param {Generator} code
+ */
+export const printChar = (code) => {
+    code.li(r.A7, 11);
+    code.ecall();
+}
+
+/**
+ * @param {Generator} code
+ */
+export const printString = (code) => {
+    code.li(r.A7, 4);
+    code.ecall();
+}
+
+/**
+ * @param {Generator} code
+ */
+export const printBool = (code) => {
+    const l1 = code.getLabel();
+    
+    code.la(r.A1, 'false');
+    code.beq(r.A0, r.ZERO, l1);
+    code.la(r.A1, 'true');
+
+    code.addLabel(l1);
+    code.mv(r.A0, r.A1);
+    code.li(r.A7, 4);
+    code.ecall();
+}
+
+/**
+ * @param {Generator} code
+ */
+export const intToString = (code) => {
+    const count = code.getLabel();
+    const endCount = code.getLabel();
+    const zeroCase = code.getLabel();
+    const loop = code.getLabel();
+    const storeLoop = code.getLabel();
+    
+    code.push(r.HP);  
+    code.li(r.T2, 10);    
+
+    code.beqz(r.T0, zeroCase);
+
+    code.mv(r.T3, r.T0);
+    code.li(r.T4, 0);
+
+    code.addLabel(count);
+    code.beqz(r.T3, endCount);
+    code.div(r.T3, r.T3, r.T2);
+    code.addi(r.T4, r.T4, 1);
+    code.j(count);
+
+    code.addLabel(endCount);
+
+    code.addLabel(loop);
+    code.rem(r.T3, r.T0, r.T2);   
+    code.addi(r.T3, r.T3, 48);
+    code.push(r.T3);
+    //code.sb(r.T3, r.HP);          
+    //code.addi(r.HP, r.HP, 1);     
+    code.div(r.T0, r.T0, r.T2);   
+    code.bnez(r.T0, loop);        
+
+    //Loop haciendo pop guardando los caracteres en el hp
+    code.addLabel(storeLoop);
+    code.pop(r.T3);
+    code.sb(r.T3, r.HP);
+    code.addi(r.HP, r.HP, 1);
+    code.addi(r.T4, r.T4, -1);
+    code.bnez(r.T4, storeLoop);
+    
+    code.sb(r.ZERO, r.HP);
+    code.addi(r.HP, r.HP, 1);
+
+    code.ret();
+
+    code.addLabel(zeroCase);
+    code.li(r.T0, 48);            
+    code.sb(r.T0, r.HP);          
+    code.addi(r.HP, r.HP, 1);
+    code.sb(r.ZERO, r.HP);        
+    code.addi(r.HP, r.HP, 1);
+}
+
+/**
+ * @param {Generator} code
+ */
+export const boolToString = (code) => {
+    const l1 = code.getLabel();
+
+    code.la(r.A1, 'false');
+    code.beq(r.T0, r.ZERO, l1);
+    code.la(r.A1, 'true');
+    code.addLabel(l1);
+    code.push(r.A1);
+}
+
+/**
+ * @param {Generator} code
+ */
+export const floatToString = (code) => {
+    
+}
+
+
+/**
+ * @param {Generator} code
+ */
+export const toString = (code) => {
+}
 
 export const builtin = {
     jump: jump,
@@ -613,5 +820,17 @@ export const builtin = {
     copyVector: copyVector,
     indexOf: indexOf,
     parseInt: parseInt,
-    parsefloat: parsefloat
+    parsefloat: parsefloat,
+    typeof: typeoff,
+    printInt: printInt,
+    printBool: printBool,
+    printChar: printChar,
+    printString: printString,
+    printFloat: printFloat,
+    toLowerCase: toLowerCase,
+    toUpperCase: toUpperCase,
+    intToString: intToString,
+    boolToString: boolToString,
+    toString: toString,
+    floatToString: floatToString
 }

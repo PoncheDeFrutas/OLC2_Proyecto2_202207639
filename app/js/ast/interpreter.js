@@ -465,21 +465,10 @@ export class InterpreterVisitor extends BaseVisitor {
         if (!(value instanceof Literal)) {
             throw new LocationError('Expected literal in variable assignment', node.location);
         }
+        
+        this.Environment.assign(node.id, value, node.location);
 
-        const operations = {
-            '=': () => value,
-            '+=': () => ArithmeticOperation('+', this.Environment.get(node.id, node.location), value, node.location),
-            '-=': () => ArithmeticOperation('-', this.Environment.get(node.id, node.location), value, node.location)
-        };
-
-        if (!(node.sig in operations)) {
-            throw new LocationError(`Unsupported operation: ${node.sig}`, node.location);
-        }
-
-        const finalValue = operations[node.sig]();
-        this.Environment.assign(node.id, finalValue, node.location);
-
-        return finalValue;
+        return value;
     }
     
     /**
@@ -502,6 +491,10 @@ export class InterpreterVisitor extends BaseVisitor {
      */
     visitCallee(node) {
         if (!node) return null;
+
+        if (typeof node.callee === 'string') {
+            node.callee = new nodes.VarValue({id:node.callee})
+        }
 
         const func = node.callee.accept(this);
         
@@ -571,7 +564,9 @@ export class InterpreterVisitor extends BaseVisitor {
 
         if (node.property instanceof Callee) {
             node.property.args.unshift(instance)
-            return node.property.accept(this);
+            const result = node.property.accept(this);
+            node.property.args.shift();
+            return result;
         }
 
         if (node.property instanceof VarValue) {
@@ -598,20 +593,8 @@ export class InterpreterVisitor extends BaseVisitor {
 
         const value = node.value.accept(this);
 
-        const operations = {
-            '=': () => value,
-            '+=': () => ArithmeticOperation('+', instance.value.get(node.property), value, node.location),
-            '-=': () => ArithmeticOperation('-', instance.value.get(node.property), value, node.location)
-        };
-
-        if (!(node.sig in operations)) {
-            throw new LocationError(`Unsupported operation: ${node.sig}`, node.location);
-        }
-
-        const finalValue = operations[node.sig]();
-        
-        instance.value.set(node.property, finalValue, node.location);
-        return finalValue;
+        instance.value.set(node.property, value, node.location);
+        return value;
     }
 
     /**

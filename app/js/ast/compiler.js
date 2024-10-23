@@ -50,11 +50,11 @@ export class CompilerVisitor extends BaseVisitor {
         this.code.comment(`Print`);
 
         const print = {
-            'int': () => this.code.printInt(),
-            'bool': () => this.code.printInt(),
-            'char': () => this.code.printChar(),
-            'string': () => this.code.printString(),
-            'float': () => this.code.printFloat(),
+            'int': () => this.code.callBuiltin('printInt'),
+            'bool': () => this.code.callBuiltin('printBool'),
+            'char': () => this.code.callBuiltin('printChar'),
+            'string': () => this.code.callBuiltin('printString'),
+            'float': () => this.code.callBuiltin('printFloat'),
         }
         
         node.exp.forEach(exp => {
@@ -250,7 +250,10 @@ export class CompilerVisitor extends BaseVisitor {
                 this.code.pushObject(object);
             }
         } else {
-            const Literal = new nodes.Literal({type:node.type, value: 0})
+            
+            
+            
+            const Literal = new nodes.Literal({type:node.type, value: 123456789})
             Literal.accept(this);
         }
 
@@ -722,6 +725,7 @@ export class CompilerVisitor extends BaseVisitor {
         instruccionesDeDeclaracionDeFuncion.forEach(ins => {
             this.code.instrucionesDeFunciones.push(ins);
         })
+        this.insideFunction = false;
     }
 
     /**
@@ -730,8 +734,40 @@ export class CompilerVisitor extends BaseVisitor {
     visitCallee(node) {
         if (!(node.callee instanceof nodes.VarValue)) return null;
         
-        const nameFunction = node.callee.id;
-        
+        let nameFunction = node.callee.id;
+
+        if (builtin.hasOwnProperty(nameFunction)) {
+            node.args[0].accept(this);
+            const object = handlePopObject(this.code, r.T0, r.FT0);
+            
+            const types = {
+                'parseInt': () => 'int',
+                'parsefloat': () => 'float',
+                'typeof': (type) => {
+                    this.code.la(r.A1, type);
+                    return 'string';
+                },
+                'toLowerCase': () => 'string',
+                'toUpperCase': () => 'string',
+                'toString': (type) => {
+                    if (type === 'bool') {
+                        nameFunction = 'boolToString';
+                    } else if (type === 'int') {
+                        nameFunction = 'intToString';
+                    } else if (type === 'float') {
+                        nameFunction = 'floatToString';
+                    }
+                    return 'string';
+                },
+            }
+            
+            const type =  types[nameFunction](object.type)
+            this.code.callBuiltin(nameFunction);
+
+            this.code.pushObject({type: type, length: 4});
+            return null;
+        }
+
         this.code.comment(`Callee ${nameFunction}`);
         
         const returnLabel = this.code.getLabel();
