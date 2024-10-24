@@ -173,6 +173,16 @@ export const Natives = {
         return new Literal({ type: 'string', value: args[0].value.properties.map(prop => prop.value).join(',') });
     }),
 
+    'length': new NativeFunction(() => 1, (interpreter, args) => {
+        if (!(args[0] instanceof Literal)) {
+            throw new LocationError('Argument must be a literal', args[0].location);
+        }
+        if (!(args[0].value instanceof ArrayListInstance)) {
+            throw new LocationError('Argument must be an ArrayList', args[0].location);
+        }
+        return new Literal({ type: 'int', value: args[0].value.properties.length });
+    }),
+
     /**
      * Returns the keys of a Struct as a string array.
      *

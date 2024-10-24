@@ -184,20 +184,16 @@ Arguments
 
 Assignment
     = id:Callee _ sig:("=" / "+=" / "-=") _ assign:Assignment {
+        let op = assign;
+        if (sig === '+=') {
+            op = createNode('Arithmetic', { op: '+', left: id, right: assign })
+        } else if (sig === '-=') {
+            op = createNode('Arithmetic', { op: '-', left: id, right: assign })
+        }
         if (id instanceof nodes.VarValue) {
-            if (sig === '=') {
-                return createNode('VarAssign', { id: id.id, assign })
-            } else {
-                let op;
-                if (sig === '+=') {
-                    op = createNode('Arithmetic', { op: '+', left: id, right: assign })
-                } else {
-                    op = createNode('Arithmetic', { op: '-', left: id, right: assign })
-                }
-                return createNode('VarAssign', { id: id.id, assign: op })
-            }
+            return createNode('VarAssign', { id: id.id, assign: op })
         } else if (id instanceof nodes.Get) {
-            return createNode('Set', { object: id.object, property: id.property, value: assign, sig })
+            return createNode('Set', { object: id.object, property: id.property, value: op})
         }
     }
     / Ternary
@@ -308,7 +304,7 @@ ArrMethods
 /* ------------------------------------------------------Callee------------------------------------------------------ */
 Callee = initial:DataType _ operations:(
         ("(" _ args:Arguments? _ ")" { return { type: 'call', args: args || [] } })
-        / ("." _ id:("length"/ArrayMethods/Id/Callee) { return { type: 'access', id } })
+        / ("." _ id:(ArrayMethods/Id/Callee) { return { type: 'access', id } })
         / ("[" _ index:Expression _ "]" { return { type: 'index', index } })
     )* {
         return operations.reduce(
@@ -342,6 +338,7 @@ DataType
     / Instance
     / typeof
     / IdValue
+    / ArrayMethods
 
 ArrayInstance
     = "{" _ args:Arguments _  "}" {
@@ -368,8 +365,7 @@ Attribute
 
 ArrayMethods
     = method:("indexOf"/"length"/"join") exp:( "(" _ arg:Expression? _ ")" { return arg })? {
-        const varValue = createNode('VarValue', { id:method })
-        return createNode('Callee', { callee: varValue, args: exp ? [exp] : [] })
+        return createNode('Callee', { callee: method, args: exp ? [exp] : [] })
     }
 
 typeof

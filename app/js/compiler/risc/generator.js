@@ -24,7 +24,8 @@ export class Generator {
         this.depth = 0;
         this.objectStack = [];
         this.instrucctions = [];
-
+        this.instrucionesDeFunciones = [];
+        
         this._labelCounter = 0;
         this._usedBuiltins = new Set();
         this.breakLabel = [];
@@ -163,6 +164,10 @@ export class Generator {
     }
 
     // Store and Load
+    mv(rd, rs1) {
+        this.instrucctions.push(new Instruction('mv', rd, rs1));
+    }
+    
     sw(rs1, rs2, imm = 0) {
         this.instrucctions.push(new Instruction('sw', rs1, `${imm}(${rs2})`));
     }
@@ -178,9 +183,21 @@ export class Generator {
     lb(rd, rs1, imm = 0) {
         this.instrucctions.push(new Instruction('lb', rd, `${imm}(${rs1})`));
     }
+    
+    lbu(rd, rs1, imm = 0) {
+        this.instrucctions.push(new Instruction('lbu', rd, `${imm}(${rs1})`));
+    }
 
     la(rd, label) {
         this.instrucctions.push(new Instruction('la', rd, label));
+    }
+    
+    srli(rd, rs1, imm) {
+        this.instrucctions.push(new Instruction('srli', rd, rs1, imm));
+    }
+    
+    slli(rd, rs1, imm) {
+        this.instrucctions.push(new Instruction('slli', rd, rs1, imm));
     }
 
     li(rd, imm) {
@@ -208,8 +225,12 @@ export class Generator {
         this.instrucctions.push(new Instruction('fmv', rd, rs1));
     }
     
-    fli(rd, imm) {
-        this.instrucctions.push(new Instruction('fli', rd, imm));
+    fmvxw(rd, rs1) {
+        this.instrucctions.push(new Instruction('fmv.x.w', rd, rs1));
+    }
+    
+    fmvwx(rd, rs1) {
+        this.instrucctions.push(new Instruction('fmv.w.x', rd, rs1));
     }
 
     // Conditional Branches
@@ -219,6 +240,26 @@ export class Generator {
 
     bne(rs1, rs2, label) {
         this.instrucctions.push(new Instruction('bne', rs1, rs2, label));
+    }
+    
+    blt(rs1, rs2, label) {
+        this.instrucctions.push(new Instruction('blt', rs1, rs2, label));
+    }
+    
+    bgt(rs1, rs2, label) {
+        this.instrucctions.push(new Instruction('bgt', rs1, rs2, label));
+    }
+    
+    bge(rs1, rs2, label) {
+        this.instrucctions.push(new Instruction('bge', rs1, rs2, label));
+    }
+    
+    beqz(rs1, label) {
+        this.instrucctions.push(new Instruction('beqz', rs1, label));
+    }
+    
+    bnez(rs1, label) {
+        this.instrucctions.push(new Instruction('bnez', rs1, label));
     }
 
     // Push and Pop
@@ -272,7 +313,7 @@ export class Generator {
     }
 
     pushObject(object) {
-        this.objectStack.push(object);
+        this.objectStack.push({...object, depth:this.depth});
     }
 
     pop(rd = r.T0) {
@@ -292,6 +333,10 @@ export class Generator {
     }
 
     // Function calls
+    jalr(rd, rs1, imm = 0) {
+        this.instrucctions.push(new Instruction('jalr', rd, rs1, imm));
+    }
+    
     jal(label) {
         this.instrucctions.push(new Instruction('jal', label));
     }
@@ -396,11 +441,22 @@ export class Generator {
         this.jal(name);
     }
 
+
+    getFrameLocal(index) {
+        const relative = this.objectStack.filter(obj => obj.type === 'local');
+        return relative[index];
+    }
+
     toString() {
         this.comment('End of program');
         this.endProgram();
+        
+        this.comment('Functions');
+        this.instrucionesDeFunciones.forEach(instruction => {
+            this.instrucctions.push(instruction);
+        })
+        
         this.comment('Builtins');
-
         Array.from(this._usedBuiltins).forEach(name => {
             this.addLabel(name);
             builtin[name](this);
@@ -409,6 +465,14 @@ export class Generator {
 
         return `
 .data
+    int: .string "int\\0"
+    float: .string "float\\0"
+    string: .string "string\\0"
+    bool: .string "bool\\0"
+    char: .string "char\\0"
+    true: .string "true\\0"
+    false: .string "false\\0"
+    null: .string "null\\0"
     heap:
 .text
 # Initialize Heap Pointer

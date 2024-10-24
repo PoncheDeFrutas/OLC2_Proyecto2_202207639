@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual de Usuario</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        h1 {
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+        }
+        ul {
+            list-style-type: disc;
+            margin-left: 20px;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border: 1px solid #ddd;
+            overflow-x: auto;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-size: 90%;
+        }
+        a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .image-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .image-container img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Manual de Usuario para el Proyecto de Interprete y Analizador de Código</h1>
+
+<h2>Descripción del Proyecto</h2>
+<p>Este proyecto es una herramienta de análisis e interpretación de código en JavaScript. Permite a los usuarios ejecutar código, visualizar el estado de las variables, generar informes en formato HTML, y manejar archivos de código con extensión <code>.oak</code>. El proyecto incluye un editor de código, un intérprete de código, y una interfaz de usuario para la visualización y gestión de la información.</p>
+
+<h2>Estructura del Proyecto</h2>
+<p>El proyecto está compuesto por los siguientes módulos principales:</p>
+<ul>
+    <li><code>index.js</code>: Archivo principal que maneja la ejecución del código, la actualización de la interfaz y el manejo de errores.</li>
+    <li><code>file-handler.js</code>: Módulo que gestiona la apertura, guardado y administración de archivos <code>.oak</code>.</li>
+    <li><code>InterpreterVisitor</code>: Clase encargada de interpretar y ejecutar el código, así como de generar un informe en formato HTML.</li>
+    <li><code>VariableTracker</code>: Clase que rastrea las variables y genera una tabla HTML con la información de las variables.</li>
+    <li><code>parse</code>: Función personalizada para analizar el código.</li>
+</ul>
+
+<h2>Funcionalidades</h2>
+
+<h3>Ejecutación de Código</h3>
+<p>El archivo <code>index.js</code> maneja la ejecución del código cuando se hace clic en el botón 'Ejecutar'. La función <code>parse</code> se utiliza para analizar el código y la clase <code>InterpreterVisitor</code> se encarga de la ejecución y manejo de errores.</p>
+
+<div class="image-container">
+    <img src="app/images/editor-example.png" alt="Editor de Código">
+    <p>Ejemplo del editor de código.</p>
+</div>
+
+<h3>Visualización de Variables</h3>
+<p>La clase <code>InterpreterVisitor</code> incluye un método <code>toHtmlTable</code> que genera una tabla HTML con la información de las variables. Esta tabla se muestra en una sección específica de la aplicación.</p>
+
+<div class="image-container">
+    <img src="app/images/variables-output.png" alt="Salida de Variables">
+    <p>Visualización de la tabla de variables en la interfaz.</p>
+</div>
+
+<h3>Manejo de Archivos</h3>
+<p>El módulo <code>file-handler.js</code> permite a los usuarios abrir, guardar y gestionar archivos <code>.oak</code>. También maneja la sincronización de números de línea y posiciones de desplazamiento en los editores de código.</p>
+
+<div class="image-container">
+    <img src="app/images/files.png" alt="Salida de Variables">
+    <p>Visualización de la tabla de variables en la interfaz.</p>
+</div>
+
+<h3>Informes HTML</h3>
+<p>El método <code>toHtmlTable</code> de la clase <code>InterpreterVisitor</code> genera un informe en formato HTML que representa las variables rastreadas durante la ejecución del código. Este informe se puede visualizar en una sección de la aplicación.</p>
+
+<div class="image-container">
+    <img src="app/images/reports.png" alt="Salida de Variables">
+    <p>Visualización de la tabla de variables en la interfaz.</p>
+</div>
+
+<h2>Clases y Métodos</h2>
+
+<h3>Clase <code>InterpreterVisitor</code></h3>
+<ul>
+    <li><strong>Constructor</strong>
+        <ul>
+            <li>Inicializa el entorno global, registra funciones nativas y configura la salida de consola.</li>
+        </ul>
+    </li>
+    <li><strong>Métodos</strong>
+        <ul>
+            <li><code>visitExpression(node)</code>: Visita un nodo de expresión.</li>
+            <li><code>visitLiteral(node)</code>: Visita un nodo literal.</li>
+            <li><code>visitArithmetic(node)</code>: Realiza una operación aritmética.</li>
+            <li><code>visitRelational(node)</code>: Realiza una operación relacional.</li>
+            <li><code>visitLogical(node)</code>: Realiza una operación lógica.</li>
+            <li><code>visitUnary(node)</code>: Realiza una operación unaria.</li>
+            <li><code>visitPrint(node)</code>: Actualiza la salida de consola.</li>
+            <li><code>visitBlock(node)</code>: Ejecuta un bloque de código.</li>
+            <li><code>visitIf(node)</code>: Ejecuta una declaración <code>if</code>.</li>
+            <li><code>visitCase(node)</code>: Ejecuta una declaración <code>case</code>.</li>
+            <li><code>visitSwitch(node)</code>: Ejecuta una declaración <code>switch</code>.</li>
+            <li><code>visitWhile(node)</code>: Ejecuta un bucle <code>while</code>.</li>
+            <li><code>visitFor(node)</code>: Ejecuta un bucle <code>for</code>.</li>
+            <li><code>visitVarDeclaration(node)</code>: Declara una variable.</li>
+            <li><code>visitVarAssign(node)</code>: Asigna un valor a una variable.</li>
+            <li><code>visitReturn(node)</code>: Devuelve un valor desde una función.</li>
+            <li><code>visitBreak(node)</code>: Rompe un bucle o switch.</li>
+            <li><code>visitContinue(node)</code>: Continua con la siguiente iteración de un bucle.</li>
+            <li><code>visitInvocable(node)</code>: Llama a una función.</li>
+            <li><code>visitOutsiderFunction(node)</code>: Llama a una función externa.</li>
+            <li><code>visitStruct(node)</code>: Define una nueva estructura.</li>
+            <li><code>visitAbstractInstance(node)</code>: Crea una instancia de una estructura abstracta.</li>
+            <li><code>visitArrayList(node)</code>: Crea una nueva lista de arreglos.</li>
+            <li><code>visitArrayListInstance(node)</code>: Manipula una instancia de lista de arreglos.</li>
+            <li><code>toHtmlTable()</code>: Genera una tabla HTML de las variables rastreadas.</li>
+        </ul>
+    </li>
+</ul>
+
+<h3>Clase <code>VariableTracker</code></h3>
+<ul>
+    <li><strong>Métodos</strong>
+        <ul>
+            <li><code>trackVariable(name, type, scope, location)</code>: Rastrea una variable.</li>
+            <li><code>getVariables()</code>: Obtiene todas las variables rastreadas.</li>
+            <li><code>clear()</code>: Limpia el rastreador de variables.</li>
+            <li><code>toHtmlTable()</code>: Genera una tabla HTML de las variables rastreadas.</li>
+        </ul>
+    </li>
+</ul>
+
+<h2>Uso</h2>
+<ol>
+    <li><strong>Abrir y Guardar Archivos</strong>
+        <ul>
+            <li>Usa el módulo <code>file-handler.js</code> para abrir y guardar archivos <code>.oak</code>.</li>
+        </ul>
+    </li>
+    <li><strong>Ejecutar Código</strong>
+        <ul>
+            <li>Escribe o pega tu código en el editor y haz clic en el botón 'Ejecutar' para analizar y ejecutar el código.</li>
+        </ul>
+    </li>
+    <li><strong>Ver Variables</strong>
+        <ul>
+            <li>Después de ejecutar el código, la tabla HTML con la información de las variables se mostrará en la sección de informes.</li>
+        </ul>
+    </li>
+    <li><strong>Generar Informes</strong>
+        <ul>
+            <li>La información sobre las variables se presenta en un informe HTML generado por el método <code>toHtmlTable</code>.</li>
+        </ul>
+    </li>
+</ol>
+
+<h2>Archivos y Estructura</h2>
+<ul>
+    <li><code>js/ast/</code>: Contiene archivos relacionados con el entorno, el intérprete, los nodos del AST, y más.</li>
+    <li><code>js/expressions/</code>: Incluye expresiones aritméticas, lógicas, relacionales y unarias.</li>
+    <li><code>js/grammar/</code>: Archivos para el análisis de gramática y configuración.</li>
+    <li><code>js/instructions/</code>: Instrucciones para manejo de estructuras, funciones y transferencia de control.</li>
+    <li><code>js/reports/</code>: Informes de errores y símbolos.</li>
+    <li><code>pages/</code>: Manejo de archivos y ejecución de scripts.</li>
+    <li><code>css/</code>: Archivos de estilos CSS.</li>
+</ul>
+
+<h2>Enlaces Útiles</h2>
+<ul>
+    <li><a href="app/index.html">Intérprete</a>: Accede a la interfaz del intérprete de código.</li>
+    <li><a href="app/docs/index.html">Documentación</a>: Consulta la documentación generada automáticamente para el proyecto.</li>
+</ul>
+
+<h2>Eliminación de Funcionalidades</h2>
+<p>Las funcionalidades relacionadas con los botones 'Vista Única' y 'Vista Doble' han sido eliminadas del proyecto, y los botones de informe están siempre visibles.</p>
+
+<h2>Contribuciones</h2>
+<p>Las contribuciones son bienvenidas. Si deseas contribuir al proyecto, por favor abre un <em>pull request</em> con tus cambios.</p>
+
+<h2>Licencia</h2>
+<p>Este proyecto está licenciado bajo la Licencia MIT - consulta el archivo <a href="LICENSE">LICENSE</a> para más detalles.</p>
+
+<p>Para cualquier pregunta o problema, no dudes en abrir un <em>issue</em> en el repositorio del proyecto.</p>
+
+</body>
+</html>
+
+
