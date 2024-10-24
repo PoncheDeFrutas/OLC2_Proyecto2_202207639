@@ -243,7 +243,7 @@ export class CompilerVisitor extends BaseVisitor {
         
         if (node.value) {
             node.value.accept(this);
-            if (this.code.getTopObject().type.startsWith("vec") && node.value instanceof nodes.VarValue) {
+            if (this.code.getTopObject().type.endsWith("[]") && node.value instanceof nodes.VarValue) {
                 const object = this.code.popObject();
                 this.code.li(r.T1, object.dim*4)
                 this.code.callBuiltin('copyVector');
@@ -579,8 +579,8 @@ export class CompilerVisitor extends BaseVisitor {
         let dim;
         if (node.type && node.dim) {
             dim = node.dim[0].value
-            for (let i = 0; i < node.dim[0].value; i++) {
-                const Literal = new nodes.Literal({type:node.type, value: 0})
+            const Literal = new nodes.Literal({type:node.type, value: 0});
+            for (let i = 0; i < dim; i++) {
                 Literal.accept(this);
             }
         } else {
@@ -598,7 +598,7 @@ export class CompilerVisitor extends BaseVisitor {
         }
 
         this.code.push(r.T2);
-        this.code.pushObject({type: 'vec' + (node.type || node.args[0].type), length: 4, dim: dim});
+        this.code.pushObject({type: (node.type || node.args[0].type) + '[]', length: 4, dim: dim});
         this.code.comment(`Array instance end`);
     }
 
@@ -632,8 +632,7 @@ export class CompilerVisitor extends BaseVisitor {
             const object = this.code.popObject();
 
             this.code.callBuiltin('getElement');
-
-            this.code.pushObject({type: object.type.slice(3), length:4 })
+            this.code.pushObject({type: object.type.slice(0, -2), length:4 })
         }
         this.code.comment(`Get end`);
     }

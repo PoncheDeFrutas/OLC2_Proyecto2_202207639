@@ -458,8 +458,8 @@ export const getElement = (code) => {
         code.or(r.T2, r.T2, r.T3);
     }
 
-    code.mv(r.T0, r.T2);
-    code.push();
+    //code.mv(r.T0, r.T2);
+    code.push(r.T2);
 }
 
 /**
