@@ -18,6 +18,9 @@
       <button id="rename-tab" class="btn btn-outline-primary mx-1">Renombrar pestaña</button>
       <button id="new-tab" class="btn btn-outline-primary mx-1">Nueva pestaña</button>
       <button id="run-code" class="btn btn-outline-primary mx-1">Ejecutar</button>
+      <button id="report1" class="btn btn-outline-primary mx-1">Reporte1</button>
+      <button id="report2" class="btn btn-outline-primary mx-1">Reporte2</button>
+      <button id="download" class="btn btn-outline-primary mx-1">descargar</button>
     </div>
   </div>
 </header>
@@ -33,7 +36,7 @@
   <div class="resizer" id="drag-bar"></div>
 
   <div class="resizable" id="right-pane">
-    <textarea readonly></textarea>
+    <label for="info-area"></label><textarea id="info-area" class="info-area" readonly></textarea>
   </div>
 </div>
 
@@ -42,6 +45,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.33.0/min/vs/loader.js"></script>
 <script src="pages/script.js"></script>
-<script src="pages/index.js"></script>
+<script src="pages/index.js" type="module"></script>
 </body>
 </html>
