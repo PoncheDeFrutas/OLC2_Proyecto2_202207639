@@ -771,12 +771,13 @@ export class CompilerVisitor extends BaseVisitor {
         
         const returnLabel = this.code.getLabel();
         
-        node.args.forEach((arg, i) => {
+        this.code.addi(r.SP, r.SP, -4*2);
+        
+        node.args.forEach(arg => {
             arg.accept(this);
-            this.code.popObject(r.T0);
-            this.code.addi(r.T1, r.SP, -4*(3+i));
-            this.code.sw(r.T0, r.T1);
         });
+
+        this.code.addi(r.SP, r.SP, 4*(node.args.length + 2));
         
         this.code.addi(r.T1, r.SP, -4);
         
@@ -785,13 +786,13 @@ export class CompilerVisitor extends BaseVisitor {
         
         this.code.push(r.FP);
         this.code.addi(r.FP, r.T1, 0);
-        
-        this.code.addi(r.SP, r.SP, -4 * node.args.length);
-        
-        this.code.j(nameFunction);
-        this.code.addLabel(returnLabel);
+
         
         const frameSize = this.functionMetadata[nameFunction].frameSize;
+        this.code.addi(r.SP, r.SP, -(frameSize - 2) * 4);
+        this.code.j(nameFunction);
+        
+        this.code.addLabel(returnLabel);
         const returnSize = frameSize -1;
         this.code.addi(r.T0, r.FP, -returnSize * 4);
         this.code.lw(r.A0, r.T0);
@@ -799,7 +800,7 @@ export class CompilerVisitor extends BaseVisitor {
         this.code.addi(r.T0, r.FP, -4);
         this.code.lw(r.FP, r.T0);
         
-        this.code.addi(r.SP, r.SP, (frameSize-1)*4);
+        this.code.addi(r.SP, r.SP, (frameSize)*4);
         
         this.code.push(r.A0);
         this.code.pushObject({type: this.functionMetadata[nameFunction].returnType, length: 4});

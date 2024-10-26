@@ -730,12 +730,9 @@ export const intToString = (code) => {
     code.rem(r.T3, r.T0, r.T2);   
     code.addi(r.T3, r.T3, 48);
     code.push(r.T3);
-    //code.sb(r.T3, r.HP);          
-    //code.addi(r.HP, r.HP, 1);     
-    code.div(r.T0, r.T0, r.T2);   
+    code.div(r.T0, r.T0, r.T2);
     code.bnez(r.T0, loop);        
 
-    //Loop haciendo pop guardando los caracteres en el hp
     code.addLabel(storeLoop);
     code.pop(r.T3);
     code.sb(r.T3, r.HP);
@@ -773,7 +770,6 @@ export const boolToString = (code) => {
  * @param {Generator} code
  */
 export const floatToString = (code) => {
-    
 }
 
 
